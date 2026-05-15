@@ -47,8 +47,9 @@ export default function ChangePasswordPage() {
       }))}; path=/; max-age=864000; SameSite=Lax`; // 10 days
 
       router.push("/");
-    } catch (err: any) {
-      setError(err.message || "Failed to change password.");
+    } catch (err) {
+      const error = err as Error;
+      setError(error.message || "Ein unerwarteter Fehler ist aufgetreten.");
     } finally {
       setIsLoading(false);
     }
