@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { pb } from "@/lib/pb";
 
 export default function ChangePasswordPage() {
+  const [oldPassword, setOldPassword] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [error, setError] = useState("");
@@ -32,6 +33,7 @@ export default function ChangePasswordPage() {
       if (!user) throw new Error("Not logged in");
 
       await pb.collection("users").update(user.id, {
+        oldPassword: oldPassword,
         password: password,
         passwordConfirm: passwordConfirm,
         needs_password_change: false,
@@ -61,13 +63,24 @@ export default function ChangePasswordPage() {
         </p>
         
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 text-sm">
             {error}
           </div>
         )}
 
         <form onSubmit={handleChangePassword} className="space-y-4">
           <div>
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Current Password</label>
+            <input
+              type="password"
+              required
+              className="w-full px-4 py-2 border border-[var(--border-color)] rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-[var(--background)] text-[var(--foreground)]"
+              value={oldPassword}
+              onChange={(e) => setOldPassword(e.target.value)}
+              placeholder="e.g. ChangeMe123!"
+            />
+          </div>
+          <div className="border-t border-[var(--border-color)] pt-4">
             <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">New Password</label>
             <input
               type="password"
@@ -90,7 +103,7 @@ export default function ChangePasswordPage() {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors disabled:opacity-50 mt-2"
           >
             {isLoading ? "Updating..." : "Update Password"}
           </button>
