@@ -58,6 +58,6 @@ export default function NoteCard({ note, onClick }: NoteCardProps) {
           )}
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }
