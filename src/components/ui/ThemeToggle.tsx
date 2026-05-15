@@ -29,7 +29,7 @@ export default function ThemeToggle() {
       whileTap={{ scale: 0.9 }}
       onClick={toggleTheme}
       className="p-2 rounded-xl bg-card border border-border shadow-sm flex items-center justify-center text-primary"
-      aria-label="Toggle Theme"
+      aria-label="Design umschalten"
     >
       {theme === "light" ? (
         <Moon className="w-5 h-5" />

@@ -32,7 +32,7 @@ export default function Header() {
             whileTap={{ scale: 0.9 }}
             onClick={handleLogout}
             className="p-2 rounded-xl bg-card border border-border shadow-sm flex items-center justify-center text-red-500"
-            title="Logout"
+            title="Abmelden"
           >
             <LogOut className="w-5 h-5" />
           </motion.button>

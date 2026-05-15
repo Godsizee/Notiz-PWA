@@ -1,22 +1,23 @@
 import { useState, useEffect, useRef } from 'react';
 import { RecordModel } from 'pocketbase';
 import { pb } from '@/lib/pb';
-import { Palette, Pin, Archive, Trash2, Plus, ListTodo } from 'lucide-react';
+import { Palette, Pin, Archive, Trash2, Plus, X, CheckCircle2, Circle } from 'lucide-react';
 import { useRealtimeChecklist } from '@/lib/useRealtime';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface ChecklistEditorProps {
-  note?: RecordModel | null; // null if new
+  note?: RecordModel | null;
   onClose: () => void;
 }
 
 const COLORS = [
   '#ffffff', 
-  'var(--color-pastel-blue)', 
-  'var(--color-pastel-green)', 
-  'var(--color-pastel-yellow)', 
-  'var(--color-pastel-pink)', 
-  'var(--color-pastel-purple)', 
-  'var(--color-pastel-orange)'
+  '#E3F2FD', // Pastel Blue
+  '#E8F5E9', // Pastel Green
+  '#FFFDE7', // Pastel Yellow
+  '#FCE4EC', // Pastel Pink
+  '#F3E5F5', // Pastel Purple
+  '#FFF3E0'  // Pastel Orange
 ];
 
 export default function ChecklistEditor({ note, onClose }: ChecklistEditorProps) {
@@ -27,14 +28,12 @@ export default function ChecklistEditor({ note, onClose }: ChecklistEditorProps)
   const [showPalette, setShowPalette] = useState(false);
   const [activeNoteId, setActiveNoteId] = useState<string | undefined>(note?.id);
   const [newItemText, setNewItemText] = useState('');
-  const newItemInputRef = useRef<HTMLInputElement>(null);
-
+  
   const { items } = useRealtimeChecklist(activeNoteId || '');
 
-  // Debounce save for note properties (title, color, pin, archive)
+  // Debounce save for note properties
   useEffect(() => {
     const saveNote = async () => {
-      // Create note if it doesn't exist and we have a title or items (handled below)
       if (!activeNoteId && !title.trim()) return;
 
       const data = {
@@ -54,7 +53,7 @@ export default function ChecklistEditor({ note, onClose }: ChecklistEditorProps)
           setActiveNoteId(record.id);
         }
       } catch (err) {
-        console.error("Failed to save checklist properties:", err);
+        console.error("Failed to save checklist:", err);
       }
     };
 
@@ -62,183 +61,224 @@ export default function ChecklistEditor({ note, onClose }: ChecklistEditorProps)
     return () => clearTimeout(timer);
   }, [title, color, isPinned, isArchived, activeNoteId]);
 
-  const handleAddItem = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!newItemText.trim()) return;
+  const ensureNoteExists = async () => {
+    if (activeNoteId) return activeNoteId;
+    
+    const record = await pb.collection('notes').create({
+      title: title || 'Unbenannte Liste',
+      type: 'checklist',
+      color,
+      is_pinned: isPinned,
+      is_archived: isArchived,
+      owner: pb.authStore.record?.id,
+    });
+    setActiveNoteId(record.id);
+    return record.id;
+  };
 
-    let noteId = activeNoteId;
-    if (!noteId) {
-      // Create note first if we haven't
-      const record = await pb.collection('notes').create({
-        title,
-        type: 'checklist',
-        color,
-        is_pinned: isPinned,
-        is_archived: isArchived,
-        owner: pb.authStore.record?.id,
-      });
-      setActiveNoteId(record.id);
-      noteId = record.id;
-    }
+  const handleAddItem = async () => {
+    if (!newItemText.trim()) return;
+    const noteId = await ensureNoteExists();
 
     try {
       await pb.collection('checklist_items').create({
         note: noteId,
         text: newItemText,
         is_completed: false,
-        order: items.length, // simple ordering
+        order: items.length,
       });
       setNewItemText('');
-      // Focus stays on input for fast typing
-      newItemInputRef.current?.focus();
     } catch (err) {
       console.error("Failed to add item:", err);
     }
   };
 
-  const handleToggleItem = (itemId: string, currentStatus: boolean) => {
-    // Optimistic delay logic (400ms delay to prevent misclicks)
-    setTimeout(async () => {
-      try {
-        await pb.collection('checklist_items').update(itemId, {
-          is_completed: !currentStatus
-        });
-      } catch (err) {
-        console.error("Failed to toggle item:", err);
-      }
-    }, 400);
+  const handleUpdateItem = async (itemId: string, text: string) => {
+    try {
+      await pb.collection('checklist_items').update(itemId, { text });
+    } catch (err) {
+      console.error("Failed to update item:", err);
+    }
   };
 
-  const handleDelete = async () => {
+  const handleToggleItem = async (itemId: string, currentStatus: boolean) => {
+    try {
+      await pb.collection('checklist_items').update(itemId, {
+        is_completed: !currentStatus
+      });
+    } catch (err) {
+      console.error("Failed to toggle item:", err);
+    }
+  };
+
+  const handleDeleteItem = async (itemId: string) => {
+    try {
+      await pb.collection('checklist_items').delete(itemId);
+    } catch (err) {
+      console.error("Failed to delete item:", err);
+    }
+  };
+
+  const handleDeleteNote = async () => {
     if (activeNoteId) {
       await pb.collection('notes').delete(activeNoteId);
     }
     onClose();
   };
 
-  const handleDeleteCompleted = async () => {
-    const completed = items.filter(i => i.is_completed);
-    for (const item of completed) {
-      await pb.collection('checklist_items').delete(item.id);
-    }
-  };
-
-  const handleUncheckAll = async () => {
-    const completed = items.filter(i => i.is_completed);
-    for (const item of completed) {
-      await pb.collection('checklist_items').update(item.id, { is_completed: false });
-    }
-  };
-
-  const activeItems = items.filter(i => !i.is_completed);
-  const completedItems = items.filter(i => i.is_completed);
+  const activeItems = items.filter(i => !i.is_completed).sort((a, b) => a.order - b.order);
+  const completedItems = items.filter(i => i.is_completed).sort((a, b) => a.order - b.order);
 
   return (
-    <div className="flex flex-col h-full min-h-[50vh] max-h-[80vh] overflow-y-auto pb-16" style={{ backgroundColor: color !== '#ffffff' ? color : 'transparent' }}>
-      {/* Title */}
-      <input
-        type="text"
-        placeholder="Titel"
-        className="w-full text-xl font-bold bg-transparent border-none outline-none mb-4 text-[var(--text-primary)] placeholder-[var(--text-muted)]"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-      />
-
-      {/* Active Items */}
-      <div className="space-y-2 mb-4">
-        {activeItems.map((item) => (
-          <div key={item.id} className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              checked={false}
-              onChange={() => handleToggleItem(item.id, false)}
-              className="w-5 h-5 cursor-pointer accent-blue-600"
-            />
-            <span className="text-[var(--text-primary)] text-base">{item.text}</span>
-          </div>
-        ))}
-
-        {/* New Item Input */}
-        <form onSubmit={handleAddItem} className="flex items-center gap-3 mt-2 border-t border-[var(--border-color)]/20 pt-2">
-          <Plus className="text-[var(--text-muted)] w-5 h-5" />
-          <input
-            ref={newItemInputRef}
-            type="text"
-            placeholder="Neuer Eintrag..."
-            className="w-full bg-transparent border-none outline-none text-base text-[var(--text-primary)] placeholder-[var(--text-muted)]"
-            value={newItemText}
-            onChange={(e) => setNewItemText(e.target.value)}
-          />
-        </form>
+    <div className="flex flex-col h-full bg-background" style={{ backgroundColor: color !== '#ffffff' ? color : undefined }}>
+      {/* Header Area */}
+      <div className="p-6 pb-2">
+        <input
+          type="text"
+          placeholder="Titel der Liste"
+          className="w-full text-2xl font-bold bg-transparent border-none outline-none text-foreground placeholder-muted-foreground/50"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+        />
       </div>
 
-      {/* Completed Items */}
-      {completedItems.length > 0 && (
-        <div className="mt-4 pt-4 border-t border-[var(--border-color)]/30">
-          <div className="flex items-center gap-2 mb-2">
-            <h4 className="text-sm font-semibold text-[var(--text-secondary)]">Erledigt ({completedItems.length})</h4>
-          </div>
-          <div className="space-y-2">
-            {completedItems.map((item) => (
-              <div key={item.id} className="flex items-center gap-3 opacity-60">
-                <input
-                  type="checkbox"
-                  checked={true}
-                  onChange={() => handleToggleItem(item.id, true)}
-                  className="w-5 h-5 cursor-pointer accent-blue-600"
-                />
-                <span className="text-[var(--text-secondary)] text-base line-through">{item.text}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Content Area */}
+      <div className="flex-1 overflow-y-auto px-6 space-y-1 pb-24">
+        {/* Active Items */}
+        <AnimatePresence initial={false}>
+          {activeItems.map((item) => (
+            <motion.div
+              key={item.id}
+              layout
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="flex items-center gap-3 group py-1"
+            >
+              <button 
+                onClick={() => handleToggleItem(item.id, false)}
+                className="text-muted-foreground hover:text-primary transition-colors"
+              >
+                <Circle className="w-5 h-5" />
+              </button>
+              <input
+                type="text"
+                className="flex-1 bg-transparent border-none outline-none text-foreground text-lg"
+                value={item.text}
+                onChange={(e) => handleUpdateItem(item.id, e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    // Just focus the "new item" input if possible or add one
+                    document.getElementById('new-item-input')?.focus();
+                  }
+                  if (e.key === 'Backspace' && item.text === '') {
+                    handleDeleteItem(item.id);
+                  }
+                }}
+              />
+              <button 
+                onClick={() => handleDeleteItem(item.id)}
+                className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-500 transition-all"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </motion.div>
+          ))}
+        </AnimatePresence>
 
-      {/* Fixed Toolbar at the bottom of the modal */}
-      <div className="fixed bottom-0 left-0 right-0 bg-[var(--card-bg)] rounded-b-2xl p-4 flex items-center justify-between border-t border-[var(--border-color)] z-50">
-        <div className="flex gap-4 relative">
-          <button onClick={() => setShowPalette(!showPalette)} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+        {/* New Item Row */}
+        <div className="flex items-center gap-3 py-2 border-t border-border/10">
+          <Plus className="w-5 h-5 text-muted-foreground/50" />
+          <input
+            id="new-item-input"
+            type="text"
+            placeholder="Punkt hinzufügen..."
+            className="flex-1 bg-transparent border-none outline-none text-foreground text-lg placeholder-muted-foreground/30"
+            value={newItemText}
+            onChange={(e) => setNewItemText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleAddItem();
+              }
+            }}
+          />
+        </div>
+
+        {/* Completed Items */}
+        {completedItems.length > 0 && (
+          <div className="mt-8">
+            <h4 className="text-sm font-semibold text-muted-foreground mb-4 flex items-center gap-2">
+              <span className="h-[1px] flex-1 bg-border/20"></span>
+              Erledigt ({completedItems.length})
+              <span className="h-[1px] flex-1 bg-border/20"></span>
+            </h4>
+            <div className="space-y-1">
+              {completedItems.map((item) => (
+                <div key={item.id} className="flex items-center gap-3 py-1 opacity-50 grayscale-[0.5]">
+                  <button onClick={() => handleToggleItem(item.id, true)} className="text-primary">
+                    <CheckCircle2 className="w-5 h-5" />
+                  </button>
+                  <span className="flex-1 text-foreground text-lg line-through">{item.text}</span>
+                  <button onClick={() => handleDeleteItem(item.id)} className="text-muted-foreground hover:text-red-500">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Modern Floating Toolbar */}
+      <div className="absolute bottom-6 left-6 right-6 h-14 bg-card/80 backdrop-blur-xl border border-border rounded-2xl shadow-2xl flex items-center justify-between px-4 z-50">
+        <div className="flex items-center gap-4 relative">
+          <button 
+            onClick={() => setShowPalette(!showPalette)} 
+            className="w-10 h-10 rounded-xl hover:bg-muted flex items-center justify-center transition-colors text-muted-foreground"
+          >
             <Palette size={20} />
           </button>
           
           {showPalette && (
-            <div className="absolute bottom-12 left-0 bg-[var(--card-bg)] shadow-lg rounded-lg p-2 flex gap-2 border border-[var(--border-color)] z-50">
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="absolute bottom-16 left-0 bg-card/95 backdrop-blur-xl border border-border shadow-2xl rounded-2xl p-3 flex gap-3 z-[60]"
+            >
               {COLORS.map(c => (
                 <button
                   key={c}
-                  className="w-6 h-6 rounded-full border border-gray-300"
+                  className="w-8 h-8 rounded-full border border-black/5 shadow-inner transition-transform hover:scale-110"
                   style={{ backgroundColor: c }}
                   onClick={() => { setColor(c); setShowPalette(false); }}
                 />
               ))}
-            </div>
+            </motion.div>
           )}
+
+          <div className="h-6 w-[1px] bg-border mx-1"></div>
 
           <button 
             onClick={() => setIsPinned(!isPinned)} 
-            className={`${isPinned ? 'text-blue-600' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${isPinned ? 'bg-blue-500/10 text-blue-500' : 'text-muted-foreground hover:bg-muted'}`}
           >
-            <Pin size={20} />
-          </button>
-          <button 
-            onClick={() => setIsArchived(!isArchived)} 
-            className={`${isArchived ? 'text-blue-600' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
-          >
-            <Archive size={20} />
+            <Pin size={20} className={isPinned ? 'fill-current' : ''} />
           </button>
           
-          {/* List specific actions */}
-          <div className="flex gap-2 ml-4 pl-4 border-l border-[var(--border-color)]">
-            <button onClick={handleUncheckAll} className="text-[var(--text-secondary)] hover:text-blue-600 text-sm font-medium" title="Alle Haken entfernen">
-              Reset
-            </button>
-            <button onClick={handleDeleteCompleted} className="text-[var(--text-secondary)] hover:text-red-600 text-sm font-medium" title="Abgehakte löschen">
-              Clean
-            </button>
-          </div>
+          <button 
+            onClick={() => setIsArchived(!isArchived)} 
+            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${isArchived ? 'bg-orange-500/10 text-orange-500' : 'text-muted-foreground hover:bg-muted'}`}
+          >
+            <Archive size={20} className={isArchived ? 'fill-current' : ''} />
+          </button>
         </div>
 
-        <button onClick={handleDelete} className="text-red-500 hover:text-red-700">
+        <button 
+          onClick={handleDeleteNote}
+          className="w-10 h-10 rounded-xl hover:bg-red-500/10 flex items-center justify-center text-red-500 transition-colors"
+        >
           <Trash2 size={20} />
         </button>
       </div>

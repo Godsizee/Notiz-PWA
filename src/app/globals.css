@@ -36,7 +36,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not(.light) {
     --background: #000000;
     --foreground: #ffffff;
     --card-bg: #1a1a1a;
@@ -58,6 +58,29 @@
     --note-blue: #2d555e;
     --note-purple: #390099;
   }
+}
+
+.dark {
+  --background: #000000;
+  --foreground: #ffffff;
+  --card-bg: #1a1a1a;
+  --text-primary: #ffffff;
+  --text-secondary: #d1d1d6;
+  --text-muted: #8e8e93;
+  --border-color: #2c2c2e;
+  --accent: #390099;
+  --accent-foreground: #ffffff;
+  --fab-bg: #390099;
+
+  /* Note colors (Darker, more vibrant in Dark Mode) */
+  --note-white: #1a1a1a;
+  --note-red: #5c2b29;
+  --note-orange: #614a19;
+  --note-yellow: #635d19;
+  --note-green: #345920;
+  --note-teal: #16504b;
+  --note-blue: #2d555e;
+  --note-purple: #390099;
 }
 
 body {
