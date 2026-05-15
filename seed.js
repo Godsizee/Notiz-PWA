@@ -1,6 +1,7 @@
 import PocketBase from 'pocketbase';
 
-const pb = new PocketBase('http://127.0.0.0:8090'); // Adjust if not running locally
+const pbUrl = process.env.POCKETBASE_URL || 'https://pb.dasdann.jetzt';
+const pb = new PocketBase(pbUrl);
 
 const ADMIN_EMAIL = 'admin@notiz.local';
 const ADMIN_PASSWORD = 'AdminPassword123!';
@@ -33,24 +34,7 @@ async function seed() {
       console.log("Admin created and logged in.");
     }
 
-    console.log("Updating Users collection schema...");
-    const usersCollection = await pb.collections.getOne('users');
-    
-    // Add needs_password_change field if it doesn't exist
-    if (!usersCollection.schema.find(f => f.name === 'needs_password_change')) {
-      usersCollection.schema.push({
-        system: false,
-        id: "needs_password_change_id",
-        name: "needs_password_change",
-        type: "bool",
-        required: false,
-        presentable: false,
-        unique: false,
-        options: {}
-      });
-      await pb.collections.update('users', usersCollection);
-      console.log("Users schema updated.");
-    }
+    console.log("Skipping Users schema update (manually done)...");
 
     console.log("Creating Notes collection...");
     try {
