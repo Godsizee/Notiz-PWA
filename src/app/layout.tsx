@@ -11,10 +11,6 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   keywords: ["nextjs", "pwa", "notes", "checklist"],
   authors: [{ name: "Your Name" }],
-  icons: [
-    { rel: "icon", url: "/icon-192x192.png" },
-    { rel: "apple-touch-icon", url: "/icon-192x192.png" },
-  ],
 };
 
 export const viewport: Viewport = {
