@@ -1,0 +1,29 @@
+version: "3.8"
+
+services:
+  notiz-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_POCKETBASE_URL=http://pocketbase:8090
+      - POCKETBASE_URL=http://pocketbase:8090
+    depends_on:
+      - pocketbase
+    restart: always
+
+  pocketbase:
+    image: ghcr.io/muchobien/pocketbase:latest
+    ports:
+      - "8090:8090"
+    volumes:
+      - pb_data:/pb_data
+      - pb_public:/pb_public
+    command: ["serve", "--http=0.0.0.0:8090"]
+    restart: always
+
+volumes:
+  pb_data:
+  pb_public:

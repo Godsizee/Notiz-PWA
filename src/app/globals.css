@@ -1,0 +1,64 @@
+@import "tailwindcss";
+
+@theme {
+  --color-pastel-blue: #A7C7E7;
+  --color-pastel-green: #C1E1C1;
+  --color-pastel-yellow: #FDFD96;
+  --color-pastel-pink: #FFD1DC;
+  --color-pastel-purple: #C3B1E1;
+  --color-pastel-orange: #FFDFBA;
+  --color-surface: #FFFFFF;
+  --color-surface-dark: #1E1E1E;
+}
+
+:root {
+  --background: #f0f4f8; /* Light gray/blueish background for better contrast with cards */
+  --foreground: #171717;
+  --card-bg: var(--color-surface);
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-muted: #9ca3af;
+  --border-color: #e5e7eb;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #121212;
+    --foreground: #ededed;
+    --card-bg: var(--color-surface-dark);
+    --text-primary: #f9fafb;
+    --text-secondary: #d1d5db;
+    --text-muted: #6b7280;
+    --border-color: #374151;
+  }
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Base utility classes for masonry */
+.my-masonry-grid {
+  display: -webkit-box; /* Not needed if autoprefixed */
+  display: -ms-flexbox; /* Not needed if autoprefixed */
+  display: flex;
+  margin-left: -16px; /* gutter size offset */
+  width: auto;
+}
+.my-masonry-grid_column {
+  padding-left: 16px; /* gutter size */
+  background-clip: padding-box;
+}
+
+/* Hide scrollbar for textarea */
+textarea::-webkit-scrollbar {
+  display: none;
+}
+textarea {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
