@@ -10,22 +10,23 @@ interface NoteCardProps {
 export default function NoteCard({ note, onClick }: NoteCardProps) {
   const { items } = useRealtimeChecklist(note.type === 'checklist' ? note.id : '');
 
-  const bgStyle = note.color && note.color !== '#ffffff' 
-    ? { backgroundColor: note.color }
-    : { backgroundColor: 'var(--card-bg)' };
-
   return (
-    <div 
+    <motion.div
+      layout
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
       onClick={onClick}
-      className="rounded-xl border border-[var(--border-color)] p-4 mb-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer relative"
-      style={bgStyle}
+      className="mb-4 break-inside-avoid cursor-pointer rounded-2xl p-4 shadow-sm hover:shadow-md transition-all duration-300 border border-[var(--border-color)] group"
+      style={{ backgroundColor: note.color || 'var(--card-bg)' }}
     >
       {note.is_pinned && (
         <Pin className="absolute top-2 right-2 text-[var(--text-muted)] w-4 h-4" />
       )}
       
       {note.title && (
-        <h3 className="font-semibold text-lg mb-2 text-[var(--text-primary)] pr-6">{note.title}</h3>
+        <h3 className="font-bold text-lg mb-2 text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors">
+          {note.title}
+        </h3>
       )}
       
       {note.type === 'text' && note.content && (

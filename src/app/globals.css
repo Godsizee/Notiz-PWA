@@ -12,39 +12,68 @@
 }
 
 :root {
-  --background: #f0f4f8; /* Light gray/blueish background for better contrast with cards */
-  --foreground: #171717;
-  --card-bg: var(--color-surface);
-  --text-primary: #111827;
-  --text-secondary: #4b5563;
-  --text-muted: #9ca3af;
-  --border-color: #e5e7eb;
+  /* Light Mode */
+  --background: #f8f9fa;
+  --foreground: #1a1a1a;
+  --card-bg: #ffffff;
+  --text-primary: #1a1a1a;
+  --text-secondary: #4a4a4a;
+  --text-muted: #8e8e93;
+  --border-color: #e5e5ea;
+  --accent: #390099;
+  --accent-foreground: #ffffff;
+  --fab-bg: #390099;
+  
+  /* Note colors (Pastel in Light Mode) */
+  --note-white: #ffffff;
+  --note-red: #f28b82;
+  --note-orange: #fbbc04;
+  --note-yellow: #fff475;
+  --note-green: #ccff90;
+  --note-teal: #a7ffeb;
+  --note-blue: #cbf0f8;
+  --note-purple: #d7aefb;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #121212;
-    --foreground: #ededed;
-    --card-bg: var(--color-surface-dark);
-    --text-primary: #f9fafb;
-    --text-secondary: #d1d5db;
-    --text-muted: #6b7280;
-    --border-color: #374151;
+    --background: #000000;
+    --foreground: #ffffff;
+    --card-bg: #1a1a1a;
+    --text-primary: #ffffff;
+    --text-secondary: #d1d1d6;
+    --text-muted: #8e8e93;
+    --border-color: #2c2c2e;
+    --accent: #390099;
+    --accent-foreground: #ffffff;
+    --fab-bg: #390099;
+
+    /* Note colors (Darker, more vibrant in Dark Mode) */
+    --note-white: #1a1a1a;
+    --note-red: #5c2b29;
+    --note-orange: #614a19;
+    --note-yellow: #635d19;
+    --note-green: #345920;
+    --note-teal: #16504b;
+    --note-blue: #2d555e;
+    --note-purple: #390099;
   }
 }
 
 body {
   background-color: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  transition: background-color 0.3s ease, color 0.3s ease;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Base utility classes for masonry */
+/* Masonry Grid Styles */
 .my-masonry-grid {
-  display: -webkit-box; /* Not needed if autoprefixed */
-  display: -ms-flexbox; /* Not needed if autoprefixed */
   display: flex;
   margin-left: -16px; /* gutter size offset */
   width: auto;
@@ -52,6 +81,13 @@ body {
 .my-masonry-grid_column {
   padding-left: 16px; /* gutter size */
   background-clip: padding-box;
+}
+
+/* Helper classes */
+.glass {
+  background: rgba(var(--card-bg), 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 /* Hide scrollbar for textarea */

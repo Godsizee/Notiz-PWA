@@ -20,9 +20,13 @@ services:
     image: ghcr.io/muchobien/pocketbase:latest
     ports:
       - "8090:8090"
+    environment:
+      - PB_ADMIN_EMAIL=admin@notiz.local
+      - PB_ADMIN_PASSWORD=AdminPassword123!
     volumes:
       - pb_data:/pb_data
       - pb_public:/pb_public
+      - ./pb_migrations:/pb_migrations
     command: ["serve", "--http=0.0.0.0:8090"]
     restart: always
 
