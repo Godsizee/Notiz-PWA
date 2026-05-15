@@ -2,7 +2,7 @@ import PocketBase from 'pocketbase';
 
 // The URL should be relative or read from environment for client-side
 // For SSR, it should point to the internal pocketbase container or external URL
-const pbUrl = process.env.NEXT_PUBLIC_POCKETBASE_URL || 'http://127.0.0.1:8090';
+const pbUrl = process.env.NEXT_PUBLIC_POCKETBASE_URL || 'https://pb.dasdann.jetzt';
 
 export const pb = new PocketBase(pbUrl);
 
