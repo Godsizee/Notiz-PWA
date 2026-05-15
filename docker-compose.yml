@@ -5,11 +5,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_POCKETBASE_URL: ${NEXT_PUBLIC_POCKETBASE_URL}
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_POCKETBASE_URL=http://pocketbase:8090
-      - POCKETBASE_URL=http://pocketbase:8090
+      - NEXT_PUBLIC_POCKETBASE_URL=${NEXT_PUBLIC_POCKETBASE_URL:-http://pocketbase:8090}
+      - POCKETBASE_URL=${POCKETBASE_URL:-http://pocketbase:8090}
     depends_on:
       - pocketbase
     restart: always
