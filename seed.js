@@ -6,10 +6,10 @@ const pb = new PocketBase(pbUrl);
 const ADMIN_EMAIL = 'admin@notiz.local';
 const ADMIN_PASSWORD = 'AdminPassword123!';
 
-// Run this using: node seed.js <user1_email> <user2_email>
+// Ausführung: node seed.js <email1> <email2>
 const args = process.argv.slice(2);
 if (args.length < 2) {
-  console.error("Please provide two email addresses: node seed.js <user1_email> <user2_email>");
+  console.error("Bitte zwei E-Mail-Adressen angeben: node seed.js <email1> <email2>");
   process.exit(1);
 }
 
@@ -19,29 +19,58 @@ const INITIAL_USER_PASSWORD = 'ChangeMe123!';
 
 async function seed() {
   try {
-    console.log("Authenticating as admin...");
+    console.log("--- Notiz PWA Seeding gestartet ---");
+    console.log(`Verbindung zu: ${pbUrl}`);
+
+    // 1. Admin Authentifizierung
     try {
       await pb.admins.authWithPassword(ADMIN_EMAIL, ADMIN_PASSWORD);
-      console.log("Logged in as existing admin.");
+      console.log("✅ Als Admin angemeldet.");
     } catch (e) {
-      console.log("Admin not found, attempting to create...");
-      await pb.admins.create({
-        email: ADMIN_EMAIL,
-        password: ADMIN_PASSWORD,
-        passwordConfirm: ADMIN_PASSWORD,
-      });
-      await pb.admins.authWithPassword(ADMIN_EMAIL, ADMIN_PASSWORD);
-      console.log("Admin created and logged in.");
+      console.log("ℹ️ Admin nicht gefunden oder Login fehlgeschlagen. Versuche Admin zu erstellen...");
+      try {
+        await pb.admins.create({
+          email: ADMIN_EMAIL,
+          password: ADMIN_PASSWORD,
+          passwordConfirm: ADMIN_PASSWORD,
+        });
+        await pb.admins.authWithPassword(ADMIN_EMAIL, ADMIN_PASSWORD);
+        console.log("✅ Admin-Konto wurde neu erstellt.");
+      } catch (adminErr) {
+        console.error("❌ Admin konnte nicht erstellt werden (ggf. schon vorhanden aber anderes PW):", adminErr.message);
+      }
     }
 
-    console.log("Skipping Users schema update (manually done)...");
-
-    console.log("Creating Notes collection...");
+    // 2. Users Collection aktualisieren (needs_password_change Feld)
+    console.log("Stelle 'users' Tabelle sicher...");
     try {
+      const usersCollection = await pb.collections.getOne('users');
+      const schema = usersCollection.schema || [];
+      
+      const fieldExists = schema.some(f => f.name === 'needs_password_change');
+      if (!fieldExists) {
+        schema.push({
+          name: "needs_password_change",
+          type: "bool",
+          required: false,
+          options: {}
+        });
+        await pb.collections.update('users', { schema });
+        console.log("✅ Feld 'needs_password_change' wurde zur Users-Tabelle hinzugefügt.");
+      } else {
+        console.log("ℹ️ Feld 'needs_password_change' existiert bereits.");
+      }
+    } catch (e) {
+      console.error("❌ Fehler beim Aktualisieren der Users-Tabelle:", e.message);
+    }
+
+    // 3. Notes Collection
+    console.log("Erstelle 'notes' Tabelle...");
+    try {
+      const usersCollection = await pb.collections.getOne('users');
       await pb.collections.create({
         name: 'notes',
         type: 'base',
-        system: false,
         schema: [
           { name: 'title', type: 'text', required: false },
           { name: 'content', type: 'text', required: false },
@@ -51,24 +80,24 @@ async function seed() {
           { name: 'is_archived', type: 'bool', required: false },
           { name: 'owner', type: 'relation', required: true, options: { collectionId: usersCollection.id, cascadeDelete: false, maxSelect: 1 } },
         ],
-        listRule: "@request.auth.id != ''",
-        viewRule: "@request.auth.id != ''",
+        listRule: "@request.auth.id != '' && owner = @request.auth.id",
+        viewRule: "@request.auth.id != '' && owner = @request.auth.id",
         createRule: "@request.auth.id != ''",
-        updateRule: "@request.auth.id != ''",
-        deleteRule: "@request.auth.id != ''",
+        updateRule: "@request.auth.id != '' && owner = @request.auth.id",
+        deleteRule: "@request.auth.id != '' && owner = @request.auth.id",
       });
-      console.log("Notes collection created.");
+      console.log("✅ 'notes' Tabelle erstellt.");
     } catch (e) {
-      console.log("Notes collection might already exist.");
+      console.log("ℹ️ 'notes' Tabelle existiert wahrscheinlich schon.");
     }
 
-    console.log("Creating Checklist Items collection...");
+    // 4. Checklist Items Collection
+    console.log("Erstelle 'checklist_items' Tabelle...");
     try {
       const notesCollection = await pb.collections.getOne('notes');
       await pb.collections.create({
         name: 'checklist_items',
         type: 'base',
-        system: false,
         schema: [
           { name: 'note', type: 'relation', required: true, options: { collectionId: notesCollection.id, cascadeDelete: true, maxSelect: 1 } },
           { name: 'text', type: 'text', required: false },
@@ -81,12 +110,13 @@ async function seed() {
         updateRule: "@request.auth.id != ''",
         deleteRule: "@request.auth.id != ''",
       });
-      console.log("Checklist Items collection created.");
+      console.log("✅ 'checklist_items' Tabelle erstellt.");
     } catch (e) {
-      console.log("Checklist Items collection might already exist.");
+      console.log("ℹ️ 'checklist_items' Tabelle existiert wahrscheinlich schon.");
     }
 
-    console.log("Creating Users...");
+    // 5. User-Accounts anlegen
+    console.log("Lege User-Accounts an...");
     for (const email of [USER1_EMAIL, USER2_EMAIL]) {
       try {
         await pb.collection('users').create({
@@ -96,16 +126,16 @@ async function seed() {
           needs_password_change: true,
           emailVisibility: true,
         });
-        console.log(`User ${email} created with password: ${INITIAL_USER_PASSWORD}`);
+        console.log(`✅ User ${email} erstellt (PW: ${INITIAL_USER_PASSWORD})`);
       } catch (e) {
-        console.log(`User ${email} already exists or error:`, e.data || e.message);
+        console.log(`ℹ️ User ${email} existiert bereits oder Fehler:`, e.message);
       }
     }
 
-    console.log("Seeding complete.");
+    console.log("--- Seeding erfolgreich abgeschlossen! ---");
 
   } catch (err) {
-    console.error("Seeding error:", err.data || err.message);
+    console.error("❌ Schwerwiegender Fehler beim Seeding:", err.message);
   }
 }
 

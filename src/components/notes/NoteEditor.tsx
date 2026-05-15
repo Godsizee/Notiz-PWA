@@ -80,26 +80,24 @@ export default function NoteEditor({ note, onClose }: NoteEditorProps) {
   return (
     <div className="flex flex-col h-full min-h-[50vh]" style={{ backgroundColor: color !== '#ffffff' ? color : 'transparent' }}>
       {/* Title */}
-      <input
-        type="text"
+      <textarea
         placeholder="Titel"
-        className="w-full text-xl font-bold bg-transparent border-none outline-none mb-4 text-[var(--text-primary)] placeholder-[var(--text-muted)]"
+        className="w-full text-2xl font-bold bg-transparent border-none focus:outline-none resize-none mb-4 text-[var(--foreground)]"
+        rows={1}
         value={title}
         onChange={(e) => setTitle(e.target.value)}
       />
 
       {/* Content */}
       <textarea
-        ref={textareaRef}
-        placeholder="Notiz..."
-        className="w-full bg-transparent border-none outline-none resize-none overflow-hidden text-base flex-grow mb-4 text-[var(--text-secondary)] placeholder-[var(--text-muted)]"
+        placeholder="Notiz schreiben..."
+        className="w-full flex-grow bg-transparent border-none focus:outline-none resize-none text-lg text-[var(--text-primary)]"
         value={content}
         onChange={(e) => setContent(e.target.value)}
-        autoFocus={!note} // Auto-focus if it's a new note
       />
 
       {/* Toolbar */}
-      <div className="flex items-center justify-between mt-auto pt-4 border-t border-[var(--border-color)]/30">
+      <div className="flex items-center justify-between mt-6 pt-4 border-t border-[var(--border-color)]">
         <div className="flex gap-4 relative">
           <button onClick={() => setShowPalette(!showPalette)} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
             <Palette size={20} />
@@ -130,11 +128,22 @@ export default function NoteEditor({ note, onClose }: NoteEditorProps) {
           >
             <Archive size={20} />
           </button>
+          <button onClick={handleDelete} className="text-red-500 hover:text-red-700">
+            <Trash2 size={20} />
+          </button>
         </div>
 
-        <button onClick={handleDelete} className="text-red-500 hover:text-red-700">
-          <Trash2 size={20} />
-        </button>
+        <div className="flex items-center gap-4">
+          <span className="text-xs text-[var(--text-muted)]">
+            {isSaving ? "Wird gespeichert..." : "Gespeichert"}
+          </span>
+          <button 
+            onClick={onClose}
+            className="bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold"
+          >
+            Fertig
+          </button>
+        </div>
       </div>
     </div>
   );
