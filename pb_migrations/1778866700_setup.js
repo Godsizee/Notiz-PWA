@@ -69,25 +69,34 @@ migrate((db) => {
     } catch (e) { /* ignore if exists */ }
   });
 
-  // 5. Create superuser (admin) if not exists (for PB v0.22+)
+  // 5. Bulletproof Superuser Upsert (PB v0.22+)
   try {
     const adminEmail = "admin@notiz.local";
     const adminPassword = "AdminPassword123!";
     
-    // In PB v0.22+, admins are superusers in a special collection
     const superusers = dao.findCollectionByNameOrId("_superusers");
     
+    let record;
     try {
-        const record = dao.findAuthRecordByEmail("_superusers", adminEmail);
-        record.setPassword(adminPassword);
-        dao.saveRecord(record);
+        // Try to find existing by email
+        record = dao.findFirstRecordByData("_superusers", "email", adminEmail);
     } catch (e) {
-        const record = new Record(superusers);
+        // Create new if not found
+        record = new Record(superusers);
         record.setEmail(adminEmail);
-        record.setPassword(adminPassword);
-        dao.saveRecord(record);
+        // Set a stable username for the admin
+        record.set("username", "admin_notiz");
     }
-  } catch (e) { /* fallback or ignore */ }
+    
+    // Always update these fields (Upsert)
+    record.setPassword(adminPassword);
+    record.set("verified", true);
+    
+    dao.saveRecord(record);
+    
+  } catch (e) {
+    // Serious error logging if possible, otherwise fail silently
+  }
 
 }, (db) => {
   // rollback logic
