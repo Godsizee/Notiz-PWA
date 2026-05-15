@@ -18,8 +18,8 @@ services:
     ports:
       - "8090:8090"
     environment:
-      - PB_ADMIN_EMAIL=admin@notiz.local
-      - PB_ADMIN_PASSWORD=AdminPassword123!
+      - PB_SUPERUSER_EMAIL=admin@notiz.local
+      - PB_SUPERUSER_PASSWORD=AdminPassword123!
     volumes:
       - pb_data:/pb_data
       - pb_public:/pb_public
