@@ -85,7 +85,8 @@ body {
 
 /* Helper classes */
 .glass {
-  background: rgba(var(--card-bg), 0.7);
+  background: var(--card-bg);
+  opacity: 0.9;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
