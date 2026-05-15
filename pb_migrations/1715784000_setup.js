@@ -69,6 +69,21 @@ migrate((db) => {
     } catch (e) { /* ignore if exists */ }
   });
 
+  // 5. Create admin user if not exists
+  try {
+    const adminEmail = "admin@notiz.local";
+    const adminPassword = "AdminPassword123!";
+    
+    // Check if any admin exists
+    const admin = dao.findAdminByEmail(adminEmail);
+    if (!admin) {
+      const newAdmin = new Admin();
+      newAdmin.email = adminEmail;
+      newAdmin.setPassword(adminPassword);
+      dao.saveAdmin(newAdmin);
+    }
+  } catch (e) { /* ignore */ }
+
 }, (db) => {
   // optional: rollback logic
 })
