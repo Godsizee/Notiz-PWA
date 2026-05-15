@@ -2,11 +2,8 @@ version: "3.8"
 
 services:
   notiz-app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        NEXT_PUBLIC_POCKETBASE_URL: ${NEXT_PUBLIC_POCKETBASE_URL}
+    image: ghcr.io/godsizee/notiz-pwa:master
+    pull_policy: always
     ports:
       - "3000:3000"
     environment:
