@@ -25,6 +25,7 @@ export default function NoteEditor({ note, onClose }: NoteEditorProps) {
   const [isPinned, setIsPinned] = useState(note?.is_pinned || false);
   const [isArchived, setIsArchived] = useState(note?.is_archived || false);
   const [showPalette, setShowPalette] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   
   // Track original ID or new ID if we created it during this session
@@ -55,6 +56,7 @@ export default function NoteEditor({ note, onClose }: NoteEditorProps) {
       };
 
       try {
+        setIsSaving(true);
         if (activeNoteId) {
           await pb.collection('notes').update(activeNoteId, data);
         } else {
@@ -63,6 +65,8 @@ export default function NoteEditor({ note, onClose }: NoteEditorProps) {
         }
       } catch (err) {
         console.error("Failed to save note:", err);
+      } finally {
+        setTimeout(() => setIsSaving(false), 500);
       }
     };
 
