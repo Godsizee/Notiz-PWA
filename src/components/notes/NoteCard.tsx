@@ -1,6 +1,7 @@
 import { RecordModel } from 'pocketbase';
 import { Pin } from 'lucide-react';
 import { useRealtimeChecklist } from '@/lib/useRealtime';
+import { motion } from 'framer-motion';
 
 interface NoteCardProps {
   note: RecordModel;
