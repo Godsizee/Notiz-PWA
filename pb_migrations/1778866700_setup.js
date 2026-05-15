@@ -74,16 +74,20 @@ migrate((db) => {
     const adminEmail = "admin@notiz.local";
     const adminPassword = "AdminPassword123!";
     
-    // Check if any admin exists
-    const admin = dao.findAdminByEmail(adminEmail);
-    if (!admin) {
-      const newAdmin = new Admin();
-      newAdmin.email = adminEmail;
-      newAdmin.setPassword(adminPassword);
-      dao.saveAdmin(newAdmin);
+    try {
+        const admin = dao.findAdminByEmail(adminEmail);
+        // If we reach here, admin exists, we can update password just to be sure
+        admin.setPassword(adminPassword);
+        dao.saveAdmin(admin);
+    } catch (e) {
+        // Admin doesn't exist, create it
+        const newAdmin = new Admin();
+        newAdmin.email = adminEmail;
+        newAdmin.setPassword(adminPassword);
+        dao.saveAdmin(newAdmin);
     }
   } catch (e) { /* ignore */ }
 
 }, (db) => {
-  // optional: rollback logic
+  // rollback logic
 })
