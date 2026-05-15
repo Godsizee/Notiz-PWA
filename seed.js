@@ -80,11 +80,11 @@ async function seed() {
           { name: 'is_archived', type: 'bool', required: false },
           { name: 'owner', type: 'relation', required: true, options: { collectionId: usersCollection.id, cascadeDelete: false, maxSelect: 1 } },
         ],
-        listRule: "@request.auth.id != '' && owner = @request.auth.id",
-        viewRule: "@request.auth.id != '' && owner = @request.auth.id",
+        listRule: "@request.auth.id != ''",
+        viewRule: "@request.auth.id != ''",
         createRule: "@request.auth.id != ''",
-        updateRule: "@request.auth.id != '' && owner = @request.auth.id",
-        deleteRule: "@request.auth.id != '' && owner = @request.auth.id",
+        updateRule: "@request.auth.id != ''",
+        deleteRule: "@request.auth.id != ''",
       });
       console.log("✅ 'notes' Tabelle erstellt.");
     } catch (e) {
