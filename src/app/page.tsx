@@ -12,6 +12,7 @@ import BottomSheet from "@/components/ui/BottomSheet";
 import NoteEditor from "@/components/notes/NoteEditor";
 import ChecklistEditor from "@/components/notes/ChecklistEditor";
 import { FileText, ListTodo, LogOut } from "lucide-react";
+import Header from "@/components/ui/Header";
 
 export default function Home() {
   const { notes } = useRealtimeNotes();
@@ -20,6 +21,29 @@ export default function Home() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [activeNote, setActiveNote] = useState<RecordModel | null>(null);
   const [editorType, setEditorType] = useState<'text' | 'checklist' | null>(null);
+
+  // Auth check
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+  useState(() => {
+    if (typeof window !== 'undefined') {
+      if (!pb.authStore.isValid) {
+        router.push("/login");
+      } else if (pb.authStore.model?.needs_password_change) {
+        router.push("/change-password");
+      } else {
+        setIsCheckingAuth(false);
+      }
+    }
+  });
+
+  if (isCheckingAuth) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   // Breakpoints for masonry grid
   const breakpointColumnsObj = {
@@ -64,33 +88,25 @@ export default function Home() {
   });
 
   return (
-    <main className="min-h-screen bg-[var(--background)] p-4 pt-8">
-      {/* Header */}
-      <header className="flex justify-between items-center mb-8 px-2">
-        <h1 className="text-2xl font-bold text-[var(--foreground)] tracking-tight">Notiz</h1>
-        <button 
-          onClick={handleLogout} 
-          className="p-2 text-[var(--text-secondary)] hover:bg-[var(--border-color)] rounded-full transition-colors"
-          aria-label="Logout"
-        >
-          <LogOut size={20} />
-        </button>
-      </header>
+    <main className="min-h-screen bg-background pb-20">
+      <Header />
 
-      {/* Masonry Grid */}
-      <Masonry
-        breakpointCols={breakpointColumnsObj}
-        className="my-masonry-grid"
-        columnClassName="my-masonry-grid_column"
-      >
-        {visibleNotes.map((note) => (
-          <NoteCard 
-            key={note.id} 
-            note={note} 
-            onClick={() => openNote(note)} 
-          />
-        ))}
-      </Masonry>
+      <div className="max-w-4xl mx-auto px-4">
+        {/* Masonry Grid */}
+        <Masonry
+          breakpointCols={breakpointColumnsObj}
+          className="my-masonry-grid"
+          columnClassName="my-masonry-grid_column"
+        >
+          {visibleNotes.map((note) => (
+            <NoteCard 
+              key={note.id} 
+              note={note} 
+              onClick={() => openNote(note)} 
+            />
+          ))}
+        </Masonry>
+      </div>
 
       {visibleNotes.length === 0 && (
         <div className="text-center mt-20 text-[var(--text-muted)]">

@@ -69,24 +69,25 @@ migrate((db) => {
     } catch (e) { /* ignore if exists */ }
   });
 
-  // 5. Create admin user if not exists
+  // 5. Create superuser (admin) if not exists (for PB v0.22+)
   try {
     const adminEmail = "admin@notiz.local";
     const adminPassword = "AdminPassword123!";
     
+    // In PB v0.22+, admins are superusers in a special collection
+    const superusers = dao.findCollectionByNameOrId("_superusers");
+    
     try {
-        const admin = dao.findAdminByEmail(adminEmail);
-        // If we reach here, admin exists, we can update password just to be sure
-        admin.setPassword(adminPassword);
-        dao.saveAdmin(admin);
+        const record = dao.findAuthRecordByEmail("_superusers", adminEmail);
+        record.setPassword(adminPassword);
+        dao.saveRecord(record);
     } catch (e) {
-        // Admin doesn't exist, create it
-        const newAdmin = new Admin();
-        newAdmin.email = adminEmail;
-        newAdmin.setPassword(adminPassword);
-        dao.saveAdmin(newAdmin);
+        const record = new Record(superusers);
+        record.setEmail(adminEmail);
+        record.setPassword(adminPassword);
+        dao.saveRecord(record);
     }
-  } catch (e) { /* ignore */ }
+  } catch (e) { /* fallback or ignore */ }
 
 }, (db) => {
   // rollback logic
