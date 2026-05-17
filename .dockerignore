@@ -15,7 +15,6 @@ yarn-error.log*
 Dockerfile
 .dockerignore
 pb_data
-pb_migrations
 seed.js
 docker-compose.yml
 README.md
