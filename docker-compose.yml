@@ -14,7 +14,9 @@ services:
     restart: always
 
   pocketbase:
-    image: ghcr.io/muchobien/pocketbase:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.pocketbase
     ports:
       - "8090:8090"
     environment:
@@ -23,8 +25,6 @@ services:
     volumes:
       - pb_data:/pb_data
       - pb_public:/pb_public
-      - ./pb_migrations:/pb_migrations
-    command: ["serve", "--http=0.0.0.0:8090"]
     restart: always
 
 volumes:

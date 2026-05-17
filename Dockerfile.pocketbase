@@ -1,0 +1,9 @@
+FROM ghcr.io/muchobien/pocketbase:latest
+
+# Kopiere die Migrationsdateien direkt fest in das Docker-Image
+COPY ./pb_migrations /pb_migrations
+
+EXPOSE 8090
+
+# Standard-Befehl zum Starten von PocketBase
+CMD ["serve", "--http=0.0.0.0:8090"]
