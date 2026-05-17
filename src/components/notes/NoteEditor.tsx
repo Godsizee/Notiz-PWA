@@ -1,37 +1,29 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { RecordModel } from 'pocketbase';
 import { pb } from '@/lib/pb';
-import { Palette, Pin, Archive, Trash2 } from 'lucide-react';
+import { Palette, Pin, Archive, Trash2, Check, ExternalLink, RefreshCw } from 'lucide-react';
+import { getNoteColorStyles, NOTE_COLORS } from '@/lib/colors';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface NoteEditorProps {
   note?: RecordModel | null; // null if creating a new note
   onClose: () => void;
 }
 
-const COLORS = [
-  '#ffffff', 
-  'var(--color-pastel-blue)', 
-  'var(--color-pastel-green)', 
-  'var(--color-pastel-yellow)', 
-  'var(--color-pastel-pink)', 
-  'var(--color-pastel-purple)', 
-  'var(--color-pastel-orange)'
-];
-
 export default function NoteEditor({ note, onClose }: NoteEditorProps) {
   const [title, setTitle] = useState(note?.title || '');
   const [content, setContent] = useState(note?.content || '');
-  const [color, setColor] = useState(note?.color || '#ffffff');
+  const [color, setColor] = useState(note?.color || 'white');
   const [isPinned, setIsPinned] = useState(note?.is_pinned || false);
   const [isArchived, setIsArchived] = useState(note?.is_archived || false);
   const [showPalette, setShowPalette] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   
-  // Track original ID or new ID if we created it during this session
+  // Track active ID to differentiate between updates and first-time creation
   const [activeNoteId, setActiveNoteId] = useState<string | undefined>(note?.id);
 
-  // Auto-expand textarea
+  // Auto-expand textarea height as content changes
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
@@ -39,12 +31,13 @@ export default function NoteEditor({ note, onClose }: NoteEditorProps) {
     }
   }, [content]);
 
-  // Debounced save
+  // Debounced auto-save (500ms)
   useEffect(() => {
     const saveNote = async () => {
-      // Don't save if empty and new
+      // Don't save if it's completely empty and hasn't been created yet
       if (!activeNoteId && !title.trim() && !content.trim()) return;
 
+      const user = pb.authStore.model || pb.authStore.record;
       const data = {
         title,
         content,
@@ -52,7 +45,7 @@ export default function NoteEditor({ note, onClose }: NoteEditorProps) {
         color,
         is_pinned: isPinned,
         is_archived: isArchived,
-        owner: pb.authStore.record?.id,
+        owner: user?.id,
       };
 
       try {
@@ -64,9 +57,10 @@ export default function NoteEditor({ note, onClose }: NoteEditorProps) {
           setActiveNoteId(record.id);
         }
       } catch (err) {
-        console.error("Failed to save note:", err);
+        console.error("Failed to auto-save note:", err);
       } finally {
-        setTimeout(() => setIsSaving(false), 500);
+        // keep saving state visible slightly longer for smooth visual transitions
+        setTimeout(() => setIsSaving(false), 400);
       }
     };
 
@@ -76,76 +70,173 @@ export default function NoteEditor({ note, onClose }: NoteEditorProps) {
 
   const handleDelete = async () => {
     if (activeNoteId) {
-      await pb.collection('notes').delete(activeNoteId);
+      try {
+        await pb.collection('notes').delete(activeNoteId);
+      } catch (err) {
+        console.error("Failed to delete note:", err);
+      }
     }
     onClose();
   };
 
+  // URL link extractor for mobile-friendly tactile link-pills
+  const getExtractedLinks = (text: string) => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const matches = text.match(urlRegex) || [];
+    // Filter out duplicates
+    return Array.from(new Set(matches));
+  };
+
+  const extractedLinks = getExtractedLinks(content);
+  const colorStyles = getNoteColorStyles(color);
+
   return (
-    <div className="flex flex-col h-full min-h-[50vh]" style={{ backgroundColor: color !== '#ffffff' ? color : 'transparent' }}>
-      {/* Title */}
+    <div 
+      className="flex flex-col h-full min-h-[55vh] p-6 pb-28 rounded-t-3xl transition-colors duration-300"
+      style={colorStyles.style}
+    >
+      {/* Title Textarea */}
       <textarea
         placeholder="Titel"
-        className="w-full text-2xl font-bold bg-transparent border-none focus:outline-none resize-none mb-4 text-[var(--foreground)]"
+        className="w-full text-2xl font-extrabold bg-transparent border-none focus:outline-none resize-none mb-4 text-[var(--text-primary)] placeholder-[var(--text-muted)]/40 leading-snug"
         rows={1}
         value={title}
         onChange={(e) => setTitle(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            textareaRef.current?.focus();
+          }
+        }}
       />
 
-      {/* Content */}
+      {/* Content Textarea */}
       <textarea
+        ref={textareaRef}
         placeholder="Notiz schreiben..."
-        className="w-full flex-grow bg-transparent border-none focus:outline-none resize-none text-lg text-[var(--text-primary)]"
+        className="w-full flex-grow bg-transparent border-none focus:outline-none resize-none text-base md:text-lg text-[var(--text-secondary)] placeholder-[var(--text-muted)]/30 min-h-[20vh] leading-relaxed"
         value={content}
         onChange={(e) => setContent(e.target.value)}
       />
 
-      {/* Toolbar */}
-      <div className="flex items-center justify-between mt-6 pt-4 border-t border-[var(--border-color)]">
-        <div className="flex gap-4 relative">
-          <button onClick={() => setShowPalette(!showPalette)} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
-            <Palette size={20} />
+      {/* Tactile URL Link Pills (Touch-first link interaction) */}
+      {extractedLinks.length > 0 && (
+        <div className="mt-8 pt-4 border-t border-[var(--border-color)]">
+          <p className="text-[10px] font-extrabold text-[var(--text-muted)] tracking-wider uppercase mb-3 flex items-center gap-1">
+            <ExternalLink className="w-3.5 h-3.5" />
+            Gefundene Links
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {extractedLinks.map((url, i) => (
+              <motion.a
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                key={i}
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-3.5 py-2 bg-background/50 border border-[var(--border-color)] text-xs font-semibold text-primary rounded-xl backdrop-blur-sm max-w-xs transition-all hover:bg-background/80"
+              >
+                <span className="truncate flex-1">{url.replace(/(https?:\/\/)?(www\.)?/, '')}</span>
+                <ExternalLink className="w-3 h-3 shrink-0 opacity-80" />
+              </motion.a>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Floating Design Toolbar */}
+      <div className="absolute bottom-6 left-6 right-6 h-14 bg-card/85 backdrop-blur-xl border border-[var(--border-color)] rounded-2xl shadow-2xl flex items-center justify-between px-4 z-50">
+        
+        {/* Left Actions */}
+        <div className="flex items-center gap-3.5 relative">
+          
+          {/* Palette button */}
+          <button 
+            onClick={() => setShowPalette(!showPalette)} 
+            className="w-10 h-10 rounded-xl hover:bg-[var(--background)]/80 flex items-center justify-center transition-colors text-[var(--text-secondary)] cursor-pointer"
+            title="Farbe ändern"
+          >
+            <Palette size={19} />
           </button>
           
-          {showPalette && (
-            <div className="absolute bottom-8 left-0 bg-[var(--card-bg)] shadow-lg rounded-lg p-2 flex gap-2 border border-[var(--border-color)] z-50">
-              {COLORS.map(c => (
-                <button
-                  key={c}
-                  className="w-6 h-6 rounded-full border border-gray-300"
-                  style={{ backgroundColor: c }}
-                  onClick={() => { setColor(c); setShowPalette(false); }}
-                />
-              ))}
-            </div>
-          )}
+          {/* Color choice popover */}
+          <AnimatePresence>
+            {showPalette && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                className="absolute bottom-16 left-0 bg-card border border-[var(--border-color)] shadow-2xl rounded-2xl p-3 flex gap-2.5 z-[60]"
+              >
+                {NOTE_COLORS.map(c => {
+                  const styleMap = getNoteColorStyles(c.hex);
+                  return (
+                    <button
+                      key={c.id}
+                      className="w-8 h-8 rounded-full border border-black/5 shadow-inner transition-transform hover:scale-115 relative flex items-center justify-center cursor-pointer"
+                      style={{ backgroundColor: c.hex }}
+                      onClick={() => { setColor(c.hex); setShowPalette(false); }}
+                      title={c.label}
+                    >
+                      {color === c.hex && (
+                        <Check className="w-4 h-4 text-slate-800" />
+                      )}
+                    </button>
+                  );
+                })}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
+          <div className="h-6 w-[1px] bg-[var(--border-color)] mx-0.5"></div>
+
+          {/* Pin Button */}
           <button 
             onClick={() => setIsPinned(!isPinned)} 
-            className={`${isPinned ? 'text-blue-600' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors cursor-pointer ${isPinned ? 'bg-primary/10 text-primary' : 'text-[var(--text-secondary)] hover:bg-[var(--background)]/80'}`}
+            title="Notiz anpinnen"
           >
-            <Pin size={20} />
+            <Pin size={19} className={isPinned ? 'fill-current' : ''} />
           </button>
+          
+          {/* Archive Button */}
           <button 
             onClick={() => setIsArchived(!isArchived)} 
-            className={`${isArchived ? 'text-blue-600' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors cursor-pointer ${isArchived ? 'bg-orange-500/10 text-orange-500' : 'text-[var(--text-secondary)] hover:bg-[var(--background)]/80'}`}
+            title="Archivieren"
           >
-            <Archive size={20} />
-          </button>
-          <button onClick={handleDelete} className="text-red-500 hover:text-red-700">
-            <Trash2 size={20} />
+            <Archive size={19} />
           </button>
         </div>
 
-        <div className="flex items-center gap-4">
-          <span className="text-xs text-[var(--text-muted)]">
-            {isSaving ? "Wird gespeichert..." : "Gespeichert"}
-          </span>
+        {/* Right Actions & Status */}
+        <div className="flex items-center gap-3">
+          
+          {/* Save Status Indicator */}
+          <div className="flex items-center gap-1.5 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider bg-[var(--background)]/50 px-2.5 py-1 rounded-full border border-[var(--border-color)]">
+            {isSaving ? (
+              <>
+                <RefreshCw className="w-3 h-3 animate-spin text-primary" />
+                <span>Auto-save...</span>
+              </>
+            ) : (
+              <>
+                <Check className="w-3 h-3 text-green-500" />
+                <span>Gespeichert</span>
+              </>
+            )}
+          </div>
+
+          <div className="h-6 w-[1px] bg-[var(--border-color)] mx-0.5"></div>
+
+          {/* Delete Button */}
           <button 
-            onClick={onClose}
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold"
+            onClick={handleDelete} 
+            className="w-10 h-10 rounded-xl hover:bg-red-500/10 flex items-center justify-center text-red-500 transition-colors cursor-pointer"
+            title="Löschen"
           >
-            Fertig
+            <Trash2 size={19} />
           </button>
         </div>
       </div>

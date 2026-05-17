@@ -1,20 +1,22 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
-
-const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Notiz PWA",
-  description: "Shared notes and checklists",
+  description: "Schlanke, performante Notiz- und Einkaufszettel-App für 2 Personen",
   generator: "Next.js",
   manifest: "/manifest.json",
-  keywords: ["nextjs", "pwa", "notes", "checklist"],
-  authors: [{ name: "Your Name" }],
+  keywords: ["nextjs", "pwa", "notes", "checklist", "shoppinglist", "keep"],
+  authors: [{ name: "Notiz App" }],
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Notiz",
+  },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#f0f4f8",
+  themeColor: "#6366f1",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -27,8 +29,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
+    <html lang="de" className="scroll-smooth">
+      <head>
+        {/* iOS splash icons and startup optimizations */}
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="mobile-web-app-capable" content="yes" />
+      </head>
+      <body className="antialiased">
         <div className="mx-auto max-w-4xl relative min-h-screen">
           {children}
         </div>

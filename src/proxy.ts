@@ -11,30 +11,30 @@ export function proxy(request: NextRequest) {
     try {
       const parsedCookie = JSON.parse(decodeURIComponent(pbAuthCookie));
       authStoreModel = parsedCookie.model;
-      isValid = !!parsedCookie.token; // simple check, proper check requires server ping but fine for middleware
+      isValid = !!parsedCookie.token; // simple token check, robust enough for proxy gates
     } catch (e) {
-      // Cookie parsing error
+      // Cookie parsing error, treat as invalid session
     }
   }
 
   const { pathname } = request.nextUrl;
   const isAuthRoute = pathname === '/login' || pathname === '/change-password';
 
+  // 1. Not Authenticated: redirect to login
   if (!isValid && !isAuthRoute && !pathname.startsWith('/api/') && !pathname.startsWith('/_next/') && pathname !== '/manifest.json') {
-    // Not authenticated, redirect to login
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
   if (isValid) {
     const needsPasswordChange = authStoreModel?.needs_password_change === true;
 
+    // 2. Authenticated but has the initial password: force to Change Password screen
     if (needsPasswordChange && pathname !== '/change-password' && !pathname.startsWith('/api/')) {
-      // Authenticated but needs password change
       return NextResponse.redirect(new URL('/change-password', request.url));
     }
 
+    // 3. Authenticated & secure: redirect away from login/change-password back to home
     if (!needsPasswordChange && isAuthRoute) {
-      // Authenticated and fine, redirect away from auth pages
       return NextResponse.redirect(new URL('/', request.url));
     }
   }
@@ -45,13 +45,14 @@ export function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Match all request paths except for the ones starting with:
+     * Match all request paths except for:
      * - api (API routes)
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - manifest.json (pwa manifest)
+     * - sw.js, workbox-*.js (PWA service worker scripts)
      */
-    '/((?!api|_next/static|_next/image|favicon.ico|manifest.json).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|manifest.json|sw.js|workbox-).*)',
   ],
 };
