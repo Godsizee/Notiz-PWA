@@ -5,5 +5,5 @@ COPY ./pb_migrations /pb_migrations
 
 EXPOSE 8090
 
-# Standard-Befehl zum Starten von PocketBase
-CMD ["serve", "--http=0.0.0.0:8090"]
+# Erzwinge explizite Pfade per CLI-Flag (100% bulletproof für Coolify!)
+CMD ["serve", "--http=0.0.0.0:8090", "--dir=/pb_data", "--publicDir=/pb_public", "--migrationsDir=/pb_migrations"]
