@@ -1,8 +1,6 @@
-migrate((db) => {
-  const dao = new Dao(db);
-
+migrate((app) => {
   // 1. Update users collection with needs_password_change field
-  const usersCollection = dao.findCollectionByNameOrId("users");
+  const usersCollection = app.findCollectionByNameOrId("users");
   const hasField = usersCollection.schema.fields().some(f => f.name === "needs_password_change");
   
   if (!hasField) {
@@ -10,7 +8,7 @@ migrate((db) => {
       name: "needs_password_change",
       type: "bool",
     }));
-    dao.saveCollection(usersCollection);
+    app.save(usersCollection);
   }
 
   // 2. Create notes collection
@@ -33,12 +31,12 @@ migrate((db) => {
       updateRule: "@request.auth.id != ''",
       deleteRule: "@request.auth.id != ''",
     });
-    dao.saveCollection(notes);
+    app.save(notes);
   } catch (e) { /* ignore if exists */ }
 
   // 3. Create checklist_items collection
   try {
-    const notes = dao.findCollectionByNameOrId("notes");
+    const notes = app.findCollectionByNameOrId("notes");
     const checklistItems = new Collection({
       name: "checklist_items",
       type: "base",
@@ -54,50 +52,47 @@ migrate((db) => {
       updateRule: "@request.auth.id != ''",
       deleteRule: "@request.auth.id != ''",
     });
-    dao.saveCollection(checklistItems);
+    app.save(checklistItems);
   } catch (e) { /* ignore if exists */ }
 
-  // 4. Create initial users
+  // 4. Create initial users (PWA Users)
   const emails = ["badesebastian@outlook.com", "claudiaborg@web.de"];
   emails.forEach(email => {
     try {
-      const user = new Record(usersCollection);
-      user.setEmail(email);
+      let user;
+      try {
+        // Find existing record by email
+        user = app.findFirstRecordByData("users", "email", email);
+      } catch (e) {
+        // Create new record if it doesn't exist
+        user = new Record(usersCollection);
+        user.set("email", email);
+      }
       user.setPassword("ChangeMe123!");
       user.set("needs_password_change", true);
-      dao.saveRecord(user);
-    } catch (e) { /* ignore if exists */ }
+      app.save(user);
+    } catch (e) { /* ignore or log */ }
   });
 
-  // 5. Bulletproof Superuser Upsert (PB v0.22+)
+  // 5. Create or Update Superuser (PB v0.23+ API)
   try {
     const adminEmail = "admin@notiz.local";
     const adminPassword = "AdminPassword123!";
     
-    const superusers = dao.findCollectionByNameOrId("_superusers");
-    
-    let record;
+    let superuser;
     try {
-        // Try to find existing by email
-        record = dao.findFirstRecordByData("_superusers", "email", adminEmail);
+      superuser = app.findSuperuserByEmail(adminEmail);
     } catch (e) {
-        // Create new if not found
-        record = new Record(superusers);
-        record.setEmail(adminEmail);
-        // Set a stable username for the admin
-        record.set("username", "admin_notiz");
+      superuser = new Superuser();
+      superuser.email = adminEmail;
     }
     
-    // Always update these fields (Upsert)
-    record.setPassword(adminPassword);
-    record.set("verified", true);
-    
-    dao.saveRecord(record);
-    
+    superuser.setPassword(adminPassword);
+    app.save(superuser);
   } catch (e) {
-    // Serious error logging if possible, otherwise fail silently
+    // ignore
   }
 
-}, (db) => {
+}, (app) => {
   // rollback logic
 })
