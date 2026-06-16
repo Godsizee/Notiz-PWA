@@ -44,7 +44,7 @@ export default function Header() {
           </motion.div>
           <div className="min-w-0">
             <h1 className="text-lg font-extrabold tracking-tight brand-text truncate">
-              Notiz PWA
+              B&amp;B Notes
             </h1>
             {userEmail && (
               <p className="hidden xs:block text-[10px] font-bold text-[var(--text-muted)] tracking-wider uppercase -mt-0.5 truncate">
