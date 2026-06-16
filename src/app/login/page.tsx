@@ -131,7 +131,7 @@ export default function LoginPage() {
             <NotebookPen className="w-8 h-8" />
           </motion.div>
           <h1 className="text-3xl font-extrabold text-center tracking-tight text-[var(--text-primary)]">
-            Notiz PWA
+            B&amp;B Notes
           </h1>
           <p className="text-sm text-[var(--text-secondary)] mt-2 text-center">
             Geschlossenes System für eingeladene Personen
