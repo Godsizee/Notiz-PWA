@@ -75,7 +75,7 @@ export default function ChangePasswordPage() {
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-        className="max-w-md w-full glass rounded-3xl p-8 md:p-10 shadow-2xl relative z-10 border border-[var(--border-color)]"
+        className="max-w-md w-full glass rounded-3xl p-6 sm:p-8 md:p-10 shadow-[var(--shadow-elevated)] relative z-10 border border-[var(--border-color)]"
       >
         {/* Header */}
         <div className="flex flex-col items-center mb-6">
@@ -169,7 +169,7 @@ export default function ChangePasswordPage() {
               whileTap={{ scale: 0.99 }}
               type="submit"
               disabled={isLoading}
-              className="w-full bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white font-bold py-4 px-4 rounded-2xl transition-all shadow-lg hover:shadow-primary/30 flex items-center justify-center gap-2 text-base cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed mt-6"
+              className="w-full bg-[var(--primary-strong)] hover:bg-[var(--primary-hover)] text-white font-bold py-4 px-4 rounded-2xl transition-all shadow-[var(--shadow-elevated)] flex items-center justify-center gap-2 text-base cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed mt-6"
             >
               {isLoading ? (
                 <>

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { pb } from "@/lib/pb";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, Lock, Layout, AlertCircle, ArrowRight, CheckCircle } from "lucide-react";
+import { Mail, Lock, NotebookPen, AlertCircle, ArrowRight, CheckCircle } from "lucide-react";
 
 const ALLOWED_EMAILS = [
   "badesebastian@outlook.com",
@@ -118,16 +118,17 @@ export default function LoginPage() {
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-        className="max-w-md w-full glass rounded-3xl p-8 md:p-10 shadow-2xl relative z-10 border border-[var(--border-color)]"
+        className="max-w-md w-full glass rounded-3xl p-6 sm:p-8 md:p-10 shadow-[var(--shadow-elevated)] relative z-10 border border-[var(--border-color)]"
       >
         {/* Header */}
         <div className="flex flex-col items-center mb-8">
           <motion.div
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center text-primary mb-4 border border-primary/20"
+            className="w-14 h-14 rounded-2xl flex items-center justify-center text-white mb-4 shadow-[var(--shadow-elevated)]"
+            style={{ backgroundImage: "var(--fab-gradient)" }}
           >
-            <Layout className="w-8 h-8" />
+            <NotebookPen className="w-8 h-8" />
           </motion.div>
           <h1 className="text-3xl font-extrabold text-center tracking-tight text-[var(--text-primary)]">
             Notiz PWA
@@ -145,7 +146,7 @@ export default function LoginPage() {
               onClick={() => switchMode(m)}
               className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all ${
                 mode === m
-                  ? "bg-[var(--primary)] text-white shadow"
+                  ? "bg-[var(--primary-strong)] text-white shadow"
                   : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
               }`}
             >
@@ -233,7 +234,7 @@ export default function LoginPage() {
                 whileTap={{ scale: 0.99 }}
                 type="submit"
                 disabled={isLoading}
-                className="w-full bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white font-bold py-4 px-4 rounded-2xl transition-all shadow-lg hover:shadow-primary/30 flex items-center justify-center gap-2 text-base cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed mt-8"
+                className="w-full bg-[var(--primary-strong)] hover:bg-[var(--primary-hover)] text-white font-bold py-4 px-4 rounded-2xl transition-all shadow-[var(--shadow-elevated)] flex items-center justify-center gap-2 text-base cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed mt-8"
               >
                 {isLoading ? (
                   <>
@@ -316,7 +317,7 @@ export default function LoginPage() {
                 whileTap={{ scale: 0.99 }}
                 type="submit"
                 disabled={isLoading}
-                className="w-full bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white font-bold py-4 px-4 rounded-2xl transition-all shadow-lg hover:shadow-primary/30 flex items-center justify-center gap-2 text-base cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed mt-6"
+                className="w-full bg-[var(--primary-strong)] hover:bg-[var(--primary-hover)] text-white font-bold py-4 px-4 rounded-2xl transition-all shadow-[var(--shadow-elevated)] flex items-center justify-center gap-2 text-base cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed mt-6"
               >
                 {isLoading ? (
                   <>

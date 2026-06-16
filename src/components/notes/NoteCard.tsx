@@ -95,7 +95,7 @@ export default function NoteCard({
       {/* Swipe-right reveal: Pin (sits on the left, behind the card) */}
       <motion.div
         style={{ opacity: pinRevealOpacity }}
-        className="absolute inset-0 rounded-3xl bg-primary flex items-center justify-start pl-6 text-white pointer-events-none"
+        className="absolute inset-0 rounded-3xl bg-primary-strong flex items-center justify-start pl-6 text-white pointer-events-none"
       >
         <Pin className="w-6 h-6 fill-current" />
       </motion.div>
@@ -125,15 +125,15 @@ export default function NoteCard({
           e.preventDefault();
           setMenuPos({ x: e.clientX, y: e.clientY });
         }}
-        className={`cursor-pointer rounded-3xl p-5 border shadow-sm transition-colors duration-300 relative overflow-hidden group select-none ${colorStyles.bg}`}
+        className={`cursor-pointer rounded-3xl p-5 border shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-elevated)] transition-shadow duration-300 relative overflow-hidden group select-none ${colorStyles.bg}`}
         style={{ x, ...colorStyles.style }}
       >
         {/* Glow Effect on Hover */}
-        <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
 
         {/* Pin Icon */}
         {note.is_pinned && (
-          <div className="absolute top-3.5 right-3.5 p-1.5 bg-background/60 backdrop-blur-md rounded-lg text-primary shadow-sm border border-[var(--border-color)] z-10 transition-transform group-hover:scale-110">
+          <div className="absolute top-3.5 right-3.5 p-1.5 bg-[var(--card-bg)]/70 backdrop-blur-md rounded-lg text-primary shadow-sm border border-[var(--border-color)] z-10 transition-transform group-hover:scale-110">
             <Pin className="w-3.5 h-3.5 fill-current" />
           </div>
         )}

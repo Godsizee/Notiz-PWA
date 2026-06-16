@@ -2,7 +2,7 @@
 
 import ThemeToggle from "./ThemeToggle";
 import { pb } from "@/lib/pb";
-import { LogOut, Layout } from "lucide-react";
+import { LogOut, NotebookPen } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
@@ -20,7 +20,6 @@ export default function Header() {
 
   const handleLogout = () => {
     pb.authStore.clear();
-    // Cookie clearing is also handled by pb.ts onChange trigger, but explicit clear is extra safe
     document.cookie = "pb_auth=; path=/; max-age=0; SameSite=Lax";
     router.push("/login");
   };
@@ -31,51 +30,53 @@ export default function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full bg-[var(--background)]/75 backdrop-blur-xl border-b border-[var(--border-color)] mb-6 transition-all duration-300">
-      <div className="flex items-center justify-between px-4 md:px-6 h-16 max-w-4xl mx-auto">
+    <header className="sticky top-0 z-40 w-full glass border-b border-[var(--border-color)] mb-6 safe-t">
+      <div className="flex items-center justify-between gap-2 px-3 sm:px-6 h-16 max-w-4xl mx-auto">
         {/* Brand */}
-        <div className="flex items-center gap-2.5">
-          <motion.div 
+        <div className="flex items-center gap-2.5 min-w-0">
+          <motion.div
             whileHover={{ scale: 1.05, rotate: -3 }}
             whileTap={{ scale: 0.95 }}
-            className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary border border-primary/15"
+            className="w-10 h-10 shrink-0 rounded-xl flex items-center justify-center text-white shadow-[var(--shadow-card)]"
+            style={{ backgroundImage: "var(--fab-gradient)" }}
           >
-            <Layout className="w-5.5 h-5.5" />
+            <NotebookPen className="w-5 h-5" />
           </motion.div>
-          <div>
-            <h1 className="text-lg font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-400">
+          <div className="min-w-0">
+            <h1 className="text-lg font-extrabold tracking-tight brand-text truncate">
               Notiz PWA
             </h1>
             {userEmail && (
-              <p className="text-[10px] font-bold text-[var(--text-muted)] tracking-wider uppercase -mt-0.5">
+              <p className="hidden xs:block text-[10px] font-bold text-[var(--text-muted)] tracking-wider uppercase -mt-0.5 truncate">
                 Gemeinsamer Workspace
               </p>
             )}
           </div>
         </div>
-        
+
         {/* Actions */}
-        <div className="flex items-center gap-3">
-          {/* User Profile Avatar */}
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+          {/* User Profile Avatar — hidden on very narrow screens */}
           {userEmail && (
-            <motion.div 
+            <motion.div
               whileHover={{ scale: 1.05 }}
-              className="w-8 h-8 rounded-full bg-gradient-to-tr from-primary to-purple-500 text-white flex items-center justify-center text-sm font-bold shadow-md cursor-help border border-white/10"
+              className="hidden xs:flex w-8 h-8 rounded-full text-white items-center justify-center text-sm font-bold shadow-md cursor-help border border-white/10"
+              style={{ backgroundImage: "var(--brand-gradient)" }}
               title={userEmail}
             >
               {getInitials(userEmail)}
             </motion.div>
           )}
 
-          <div className="h-4 w-[1px] bg-[var(--border-color)] mx-0.5"></div>
+          <div className="hidden xs:block h-4 w-[1px] bg-[var(--border-color)] mx-0.5" />
 
           <ThemeToggle />
-          
+
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={handleLogout}
-            className="w-9 h-9 rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)] shadow-sm hover:shadow-md flex items-center justify-center text-red-500 hover:bg-red-500/5 transition-all cursor-pointer"
+            className="w-9 h-9 rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)] shadow-sm hover:shadow-md flex items-center justify-center text-red-500 hover:bg-red-500/10 transition-all cursor-pointer"
             title="Abmelden"
           >
             <LogOut className="w-4.5 h-4.5" />

@@ -10,18 +10,36 @@ export const metadata: Metadata = {
   authors: [{ name: "Notiz App" }],
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
     title: "Notiz",
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#6366f1",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#390099" },
+    { media: "(prefers-color-scheme: dark)", color: "#0b0717" },
+  ],
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  viewportFit: "cover",
 };
+
+// Set the theme class before first paint to avoid a flash of the wrong theme.
+const themeScript = `
+(function () {
+  try {
+    var saved = localStorage.getItem('theme');
+    var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    var theme = saved || (prefersDark ? 'dark' : 'light');
+    document.documentElement.classList.add(theme);
+  } catch (e) {
+    document.documentElement.classList.add('light');
+  }
+})();
+`;
 
 export default function RootLayout({
   children,
@@ -29,13 +47,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="de" className="scroll-smooth">
+    <html lang="de" className="scroll-smooth" suppressHydrationWarning>
       <head>
-        {/* iOS splash icons and startup optimizations */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="mobile-web-app-capable" content="yes" />
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body className="antialiased">
+      <body className="antialiased safe-x">
         <div className="mx-auto max-w-4xl relative min-h-screen">
           {children}
         </div>

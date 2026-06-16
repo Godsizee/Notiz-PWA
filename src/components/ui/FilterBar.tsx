@@ -54,7 +54,7 @@ export default function FilterBar({
               <motion.span
                 layoutId="filter-pill"
                 transition={{ type: 'spring', damping: 26, stiffness: 320 }}
-                className="absolute inset-0 bg-primary rounded-full -z-0"
+                className="absolute inset-0 bg-primary-strong rounded-full -z-0"
               />
             )}
             <span className="relative z-10">{f.label}</span>

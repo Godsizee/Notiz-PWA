@@ -1,9 +1,28 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
+/* ------------------------------------------------------------------ */
+/*  Static design tokens (compile-time)                                */
+/* ------------------------------------------------------------------ */
 @theme {
   --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  
+
+  /* Extra breakpoint for very narrow foldable cover displays */
+  --breakpoint-xs: 24rem;
+
+  /* Signature brand violet scale — built around #390099 */
+  --color-brand-50:  #f4ecff;
+  --color-brand-100: #e7d5ff;
+  --color-brand-200: #cfabff;
+  --color-brand-300: #b07bff;
+  --color-brand-400: #9d4edd;
+  --color-brand-500: #7b2cbf;
+  --color-brand-600: #5a189a;
+  --color-brand:     #390099; /* core brand value — present in both themes */
+  --color-brand-800: #2d007a;
+  --color-brand-900: #1f0057;
+
+  /* Pastel note accents */
   --color-pastel-blue: #a0c4ff;
   --color-pastel-green: #caffbf;
   --color-pastel-yellow: #fdffb6;
@@ -12,70 +31,121 @@
   --color-pastel-orange: #ffd166;
 }
 
+/* ------------------------------------------------------------------ */
+/*  Semantic tokens wired to runtime CSS variables (theme switching)   */
+/*  `inline` keeps the utilities pointing at the live variable so they */
+/*  react to .dark / .light without a rebuild.                         */
+/* ------------------------------------------------------------------ */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card-bg);
+  --color-border: var(--border-color);
+  --color-primary: var(--primary);
+  --color-primary-strong: var(--primary-strong);
+  --color-primary-hover: var(--primary-hover);
+  --color-accent: var(--accent);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Light theme                                                        */
+/* ------------------------------------------------------------------ */
 :root {
-  /* Light Theme Brand Variables */
-  --background: #f3f4f6;
-  --foreground: #0f172a;
+  --background: #f5f3fb;
+  --background-soft: #ece8f7;
+  --foreground: #1a0f33;
   --card-bg: #ffffff;
-  --border-color: rgba(15, 23, 42, 0.08);
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-muted: #94a3b8;
-  
-  --primary: #6366f1;
-  --primary-hover: #4f46e5;
-  --primary-light: #e0e7ff;
-  --fab-bg: #6366f1;
-  
+  --border-color: rgba(57, 0, 153, 0.10);
+
+  --text-primary: #1a0f33;
+  --text-secondary: #564b6e;
+  --text-muted: #8b84a3;
+
+  /* Brand action colors */
+  --primary: #390099;          /* accent text / icon on light surfaces */
+  --primary-strong: #390099;   /* filled buttons — always pairs with white text */
+  --accent: #5a189a;           /* secondary gradient stop */
+  --primary-hover: #2d007a;    /* button hover */
+  --primary-on: #ffffff;       /* text on a filled primary button */
+  --primary-light: rgba(57, 0, 153, 0.08);
+  --primary-ring: rgba(57, 0, 153, 0.30);
+
+  --fab-bg: #390099;
+  --fab-gradient: linear-gradient(135deg, #5a189a 0%, #390099 100%);
+  --brand-gradient: linear-gradient(120deg, #390099 0%, #7b2cbf 100%);
+  --glow-a: rgba(57, 0, 153, 0.10);
+  --glow-b: rgba(157, 78, 221, 0.10);
+
+  --shadow-card: 0 1px 2px rgba(26, 15, 51, 0.04), 0 6px 18px -8px rgba(57, 0, 153, 0.12);
+  --shadow-elevated: 0 12px 40px -12px rgba(57, 0, 153, 0.28);
+
   /* Note Glass / Pastel Colors - Light Mode */
   --note-white: #ffffff;
-  --note-white-border: rgba(15, 23, 42, 0.08);
-  --note-white-icon: #64748b;
-  
+  --note-white-border: rgba(57, 0, 153, 0.08);
+  --note-white-icon: #6b6385;
+
   --note-blue: #eff6ff;
   --note-blue-border: #bfdbfe;
-  --note-blue-icon: #3b82f6;
+  --note-blue-icon: #2563eb;
 
   --note-green: #f0fdf4;
   --note-green-border: #bbf7d0;
-  --note-green-icon: #22c55e;
+  --note-green-icon: #16a34a;
 
   --note-yellow: #fefce8;
-  --note-yellow-border: #fef08a;
-  --note-yellow-icon: #eab308;
+  --note-yellow-border: #fde68a;
+  --note-yellow-icon: #ca8a04;
 
-  --note-pink: #fff5f5;
-  --note-pink-border: #fecaca;
-  --note-pink-icon: #ef4444;
+  --note-pink: #fdf2f8;
+  --note-pink-border: #fbcfe8;
+  --note-pink-icon: #db2777;
 
   --note-purple: #faf5ff;
   --note-purple-border: #e9d5ff;
-  --note-purple-icon: #a855f7;
+  --note-purple-icon: #7c3aed;
 
   --note-orange: #fff7ed;
   --note-orange-border: #fed7aa;
-  --note-orange-icon: #f97316;
+  --note-orange-icon: #ea580c;
 }
 
+/* ------------------------------------------------------------------ */
+/*  Dark theme                                                         */
+/* ------------------------------------------------------------------ */
 .dark {
-  /* Dark Theme Brand Variables */
-  --background: #07090e;
-  --foreground: #f8fafc;
-  --card-bg: #0f121d;
-  --border-color: rgba(248, 250, 252, 0.08);
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  
-  --primary: #818cf8;
-  --primary-hover: #6366f1;
-  --primary-light: rgba(99, 102, 241, 0.15);
-  --fab-bg: #818cf8;
+  --background: #0b0717;
+  --background-soft: #140c28;
+  --foreground: #f3f0fb;
+  --card-bg: #17112b;
+  --border-color: rgba(199, 165, 255, 0.12);
+
+  --text-primary: #f3f0fb;
+  --text-secondary: #c2bad8;
+  --text-muted: #897fa6;
+
+  /* Brand action colors — lighter accent text for contrast on dark,
+     while #390099 stays present in fills, gradients and glows. */
+  --primary: #c77dff;          /* accent text / icon on dark surfaces */
+  --primary-strong: #5a189a;   /* filled buttons — dark enough for white text */
+  --accent: #9d4edd;
+  --primary-hover: #4a149c;
+  --primary-on: #ffffff;
+  --primary-light: rgba(157, 78, 221, 0.16);
+  --primary-ring: rgba(157, 78, 221, 0.45);
+
+  --fab-bg: #390099;
+  --fab-gradient: linear-gradient(135deg, #7b2cbf 0%, #390099 100%);
+  --brand-gradient: linear-gradient(120deg, #c77dff 0%, #7b2cbf 100%);
+  --glow-a: rgba(57, 0, 153, 0.45);
+  --glow-b: rgba(157, 78, 221, 0.18);
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -10px rgba(0, 0, 0, 0.6);
+  --shadow-elevated: 0 16px 50px -12px rgba(0, 0, 0, 0.7);
 
   /* Note Glass / Vibrant Colors - Dark Mode */
-  --note-white: #0f121d;
-  --note-white-border: rgba(248, 250, 252, 0.08);
-  --note-white-icon: #64748b;
+  --note-white: #17112b;
+  --note-white-border: rgba(199, 165, 255, 0.12);
+  --note-white-icon: #897fa6;
 
   --note-blue: rgba(30, 48, 80, 0.45);
   --note-blue-border: rgba(59, 130, 246, 0.35);
@@ -93,59 +163,70 @@
   --note-pink-border: rgba(239, 68, 68, 0.35);
   --note-pink-icon: #fca5a5;
 
-  --note-purple: rgba(42, 28, 70, 0.45);
-  --note-purple-border: rgba(168, 85, 247, 0.35);
-  --note-purple-icon: #c084fc;
+  --note-purple: rgba(57, 0, 153, 0.32);
+  --note-purple-border: rgba(157, 78, 221, 0.45);
+  --note-purple-icon: #c77dff;
 
   --note-orange: rgba(50, 32, 20, 0.45);
   --note-orange-border: rgba(249, 115, 22, 0.35);
   --note-orange-icon: #ffb07c;
 }
 
+/* No-JS fallback: honor the OS preference when no explicit theme class set */
 @media (prefers-color-scheme: dark) {
-  :root:not(.light) {
-    /* Auto-enable dark variables if light class is not explicitly added */
-    --background: #07090e;
-    --foreground: #f8fafc;
-    --card-bg: #0f121d;
-    --border-color: rgba(248, 250, 252, 0.08);
-    --text-primary: #f8fafc;
-    --text-secondary: #94a3b8;
-    --text-muted: #64748b;
-    
-    --primary: #818cf8;
-    --primary-hover: #6366f1;
-    --primary-light: rgba(99, 102, 241, 0.15);
-    --fab-bg: #818cf8;
-
-    --note-white: #0f121d;
-    --note-white-border: rgba(248, 250, 252, 0.08);
-    --note-white-icon: #64748b;
-
+  :root:not(.light):not(.dark) {
+    --background: #0b0717;
+    --background-soft: #140c28;
+    --foreground: #f3f0fb;
+    --card-bg: #17112b;
+    --border-color: rgba(199, 165, 255, 0.12);
+    --text-primary: #f3f0fb;
+    --text-secondary: #c2bad8;
+    --text-muted: #897fa6;
+    --primary: #c77dff;
+    --primary-strong: #5a189a;
+    --accent: #9d4edd;
+    --primary-hover: #4a149c;
+    --primary-on: #ffffff;
+    --primary-light: rgba(157, 78, 221, 0.16);
+    --primary-ring: rgba(157, 78, 221, 0.45);
+    --fab-bg: #390099;
+    --fab-gradient: linear-gradient(135deg, #7b2cbf 0%, #390099 100%);
+    --brand-gradient: linear-gradient(120deg, #c77dff 0%, #7b2cbf 100%);
+    --glow-a: rgba(57, 0, 153, 0.45);
+    --glow-b: rgba(157, 78, 221, 0.18);
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -10px rgba(0, 0, 0, 0.6);
+    --shadow-elevated: 0 16px 50px -12px rgba(0, 0, 0, 0.7);
+    --note-white: #17112b;
+    --note-white-border: rgba(199, 165, 255, 0.12);
+    --note-white-icon: #897fa6;
     --note-blue: rgba(30, 48, 80, 0.45);
     --note-blue-border: rgba(59, 130, 246, 0.35);
     --note-blue-icon: #60a5fa;
-
     --note-green: rgba(24, 50, 36, 0.45);
     --note-green-border: rgba(34, 197, 94, 0.35);
     --note-green-icon: #4ade80;
-
     --note-yellow: rgba(50, 42, 20, 0.45);
     --note-yellow-border: rgba(234, 179, 8, 0.35);
     --note-yellow-icon: #facc15;
-
     --note-pink: rgba(50, 24, 28, 0.45);
     --note-pink-border: rgba(239, 68, 68, 0.35);
     --note-pink-icon: #fca5a5;
-
-    --note-purple: rgba(42, 28, 70, 0.45);
-    --note-purple-border: rgba(168, 85, 247, 0.35);
-    --note-purple-icon: #c084fc;
-
+    --note-purple: rgba(57, 0, 153, 0.32);
+    --note-purple-border: rgba(157, 78, 221, 0.45);
+    --note-purple-icon: #c77dff;
     --note-orange: rgba(50, 32, 20, 0.45);
     --note-orange-border: rgba(249, 115, 22, 0.35);
     --note-orange-icon: #ffb07c;
   }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Base                                                               */
+/* ------------------------------------------------------------------ */
+html {
+  /* allow content to flow into the notch / rounded corners on mobile */
+  background-color: var(--background);
 }
 
 body {
@@ -155,24 +236,48 @@ body {
   transition: background-color 0.4s cubic-bezier(0.16, 1, 0.3, 1), color 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   margin: 0;
   padding: 0;
+  min-height: 100dvh;
   -webkit-tap-highlight-color: transparent;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
-/* Premium Glassmorphic Layer */
+::selection {
+  background: var(--primary-light);
+  color: var(--text-primary);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Utilities                                                          */
+/* ------------------------------------------------------------------ */
+
+/* Safe-area helpers for notched / folding phones */
+.safe-t { padding-top: env(safe-area-inset-top); }
+.safe-b { padding-bottom: env(safe-area-inset-bottom); }
+.safe-x { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+
+/* Brand gradient text */
+.brand-text {
+  background-image: var(--brand-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Premium glassmorphic layer */
 .glass {
-  background: rgba(15, 18, 32, 0.6);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--card-bg) 75%, transparent);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border: 1px solid var(--border-color);
 }
 
-.light .glass {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(0, 0, 0, 0.06);
+/* Elevated surface helper */
+.surface {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-card);
 }
 
 /* Responsive Masonry Grid */
@@ -184,6 +289,10 @@ body {
 .my-masonry-grid_column {
   padding-left: 16px;
   background-clip: padding-box;
+}
+@media (max-width: 380px) {
+  .my-masonry-grid { margin-left: -10px; }
+  .my-masonry-grid_column { padding-left: 10px; }
 }
 
 /* Hide scrollbars but allow scrolling */
@@ -197,17 +306,25 @@ textarea::-webkit-scrollbar-track,
 }
 textarea::-webkit-scrollbar-thumb,
 .overflow-y-auto::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.2);
+  background: var(--primary-ring);
   border-radius: 9999px;
 }
 textarea::-webkit-scrollbar-thumb:hover,
 .overflow-y-auto::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.4);
+  background: var(--primary);
 }
-
 textarea {
   -ms-overflow-style: none;
   scrollbar-width: thin;
+}
+
+/* Horizontal scroll without a visible scrollbar (filter bar, chip rows) */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
 /* Custom Checkbox Animations */
@@ -218,32 +335,39 @@ textarea {
   transform: scale(0.85);
 }
 
-/* Modern inputs & UI focus glow */
 input, textarea {
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-/* Page entrance animations */
+/* Page entrance animation */
 @keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-
 .animate-fade-in-up {
   animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* Horizontal scroll without a visible scrollbar (filter bar, chip rows) */
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+/* Shimmer skeleton sweep */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
+.shimmer {
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--primary) 14%, transparent) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

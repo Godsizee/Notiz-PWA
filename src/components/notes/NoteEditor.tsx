@@ -151,15 +151,18 @@ export default function NoteEditor({ note, onClose, onRequestDelete }: NoteEdito
       )}
 
       {/* Floating Design Toolbar */}
-      <div className="absolute bottom-6 left-6 right-6 h-14 bg-card/85 backdrop-blur-xl border border-[var(--border-color)] rounded-2xl shadow-2xl flex items-center justify-between px-4 z-50">
-        
+      <div
+        className="absolute bottom-4 left-3 right-3 sm:bottom-6 sm:left-6 sm:right-6 h-14 bg-[var(--card-bg)]/85 backdrop-blur-xl border border-[var(--border-color)] rounded-2xl shadow-[var(--shadow-elevated)] flex items-center justify-between px-2 sm:px-4 z-50"
+        style={{ marginBottom: "env(safe-area-inset-bottom)" }}
+      >
+
         {/* Left Actions */}
-        <div className="flex items-center gap-3.5 relative">
-          
+        <div className="flex items-center gap-1 sm:gap-3.5 relative">
+
           {/* Palette button */}
-          <button 
-            onClick={() => setShowPalette(!showPalette)} 
-            className="w-10 h-10 rounded-xl hover:bg-[var(--background)]/80 flex items-center justify-center transition-colors text-[var(--text-secondary)] cursor-pointer"
+          <button
+            onClick={() => setShowPalette(!showPalette)}
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl hover:bg-[var(--background)]/80 flex items-center justify-center transition-colors text-[var(--text-secondary)] cursor-pointer"
             title="Farbe ändern"
           >
             <Palette size={19} />
@@ -172,13 +175,13 @@ export default function NoteEditor({ note, onClose, onRequestDelete }: NoteEdito
                 initial={{ opacity: 0, y: 10, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                className="absolute bottom-16 left-0 bg-card border border-[var(--border-color)] shadow-2xl rounded-2xl p-3 flex gap-2.5 z-[60]"
+                className="absolute bottom-16 left-0 bg-[var(--card-bg)] border border-[var(--border-color)] shadow-[var(--shadow-elevated)] rounded-2xl p-3 flex flex-wrap gap-2 max-w-[min(18rem,calc(100vw-1.5rem))] z-[60]"
               >
                 {NOTE_COLORS.map(c => {
                   return (
                     <button
                       key={c.id}
-                      className="w-8 h-8 rounded-full border border-black/5 shadow-inner transition-transform hover:scale-115 relative flex items-center justify-center cursor-pointer"
+                      className="w-7 h-7 rounded-full border border-black/10 shadow-inner transition-transform hover:scale-115 relative flex items-center justify-center cursor-pointer"
                       style={{ backgroundColor: c.hex }}
                       onClick={() => { setColor(c.hex); setShowPalette(false); }}
                       title={c.label}
@@ -193,21 +196,21 @@ export default function NoteEditor({ note, onClose, onRequestDelete }: NoteEdito
             )}
           </AnimatePresence>
 
-          <div className="h-6 w-[1px] bg-[var(--border-color)] mx-0.5"></div>
+          <div className="h-6 w-px bg-[var(--border-color)] mx-0.5"></div>
 
           {/* Pin Button */}
-          <button 
-            onClick={() => setIsPinned(!isPinned)} 
-            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors cursor-pointer ${isPinned ? 'bg-primary/10 text-primary' : 'text-[var(--text-secondary)] hover:bg-[var(--background)]/80'}`}
+          <button
+            onClick={() => setIsPinned(!isPinned)}
+            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-colors cursor-pointer ${isPinned ? 'bg-primary/10 text-primary' : 'text-[var(--text-secondary)] hover:bg-[var(--background)]/80'}`}
             title="Notiz anpinnen"
           >
             <Pin size={19} className={isPinned ? 'fill-current' : ''} />
           </button>
-          
+
           {/* Archive Button */}
-          <button 
-            onClick={() => setIsArchived(!isArchived)} 
-            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors cursor-pointer ${isArchived ? 'bg-orange-500/10 text-orange-500' : 'text-[var(--text-secondary)] hover:bg-[var(--background)]/80'}`}
+          <button
+            onClick={() => setIsArchived(!isArchived)}
+            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-colors cursor-pointer ${isArchived ? 'bg-orange-500/10 text-orange-500' : 'text-[var(--text-secondary)] hover:bg-[var(--background)]/80'}`}
             title="Archivieren"
           >
             <Archive size={19} />
@@ -215,29 +218,29 @@ export default function NoteEditor({ note, onClose, onRequestDelete }: NoteEdito
         </div>
 
         {/* Right Actions & Status */}
-        <div className="flex items-center gap-3">
-          
-          {/* Save Status Indicator */}
-          <div className="flex items-center gap-1.5 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider bg-[var(--background)]/50 px-2.5 py-1 rounded-full border border-[var(--border-color)]">
+        <div className="flex items-center gap-1 sm:gap-3">
+
+          {/* Save Status Indicator — collapses to an icon on very narrow screens */}
+          <div className="flex items-center gap-1.5 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider bg-[var(--background)]/50 px-2 sm:px-2.5 py-1 rounded-full border border-[var(--border-color)]">
             {isSaving ? (
               <>
                 <RefreshCw className="w-3 h-3 animate-spin text-primary" />
-                <span>Auto-save...</span>
+                <span className="hidden xs:inline">Auto-save...</span>
               </>
             ) : (
               <>
                 <Check className="w-3 h-3 text-green-500" />
-                <span>Gespeichert</span>
+                <span className="hidden xs:inline">Gespeichert</span>
               </>
             )}
           </div>
 
-          <div className="h-6 w-[1px] bg-[var(--border-color)] mx-0.5"></div>
+          <div className="hidden xs:block h-6 w-px bg-[var(--border-color)] mx-0.5"></div>
 
           {/* Delete Button */}
-          <button 
-            onClick={handleDelete} 
-            className="w-10 h-10 rounded-xl hover:bg-red-500/10 flex items-center justify-center text-red-500 transition-colors cursor-pointer"
+          <button
+            onClick={handleDelete}
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl hover:bg-red-500/10 flex items-center justify-center text-red-500 transition-colors cursor-pointer"
             title="Löschen"
           >
             <Trash2 size={19} />

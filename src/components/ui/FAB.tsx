@@ -74,7 +74,7 @@ export default function FAB({ onCreateText, onCreateChecklist }: FABProps) {
         )}
       </AnimatePresence>
 
-      <div className="fixed bottom-8 right-6 z-40 flex flex-col items-end gap-3">
+      <div className="fixed bottom-6 right-5 sm:bottom-8 sm:right-6 z-40 flex flex-col items-end gap-3" style={{ marginBottom: "env(safe-area-inset-bottom)" }}>
         {/* Long-press type picker */}
         <AnimatePresence>
           {menuOpen && (
@@ -113,7 +113,8 @@ export default function FAB({ onCreateText, onCreateChecklist }: FABProps) {
           onPointerUp={handlePointerUp}
           onPointerLeave={handlePointerLeave}
           onContextMenu={(e) => e.preventDefault()}
-          className="w-14 h-14 bg-[var(--fab-bg)] text-white rounded-2xl shadow-lg flex items-center justify-center hover:scale-110 active:scale-95 transition-transform duration-200 border border-white/10 select-none touch-none"
+          style={{ backgroundImage: "var(--fab-gradient)" }}
+          className="w-14 h-14 text-white rounded-2xl shadow-[var(--shadow-elevated)] flex items-center justify-center hover:scale-110 active:scale-95 transition-transform duration-200 border border-white/15 select-none touch-none ring-1 ring-black/5"
           aria-label="Notiz erstellen — tippen für Notiz, halten für Auswahl"
         >
           <motion.span animate={{ rotate: menuOpen ? 45 : 0 }} transition={{ duration: 0.2 }}>

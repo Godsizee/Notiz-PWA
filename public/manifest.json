@@ -4,8 +4,8 @@
   "description": "Shared notes and checklists",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f0f4f8",
-  "theme_color": "#f0f4f8",
+  "background_color": "#0b0717",
+  "theme_color": "#390099",
   "icons": [
     {
       "src": "/icon-192x192.png",
@@ -15,7 +15,8 @@
     {
       "src": "/icon-512x512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }

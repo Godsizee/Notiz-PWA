@@ -50,14 +50,14 @@ export default function BottomSheet({ isOpen, onClose, children }: BottomSheetPr
             dragConstraints={{ top: 0, bottom: 0 }}
             dragElastic={{ top: 0, bottom: 1 }}
             onDragEnd={handleDragEnd}
-            className="fixed bottom-0 left-0 right-0 bg-[var(--card-bg)] rounded-t-2xl p-4 z-50 shadow-xl max-w-4xl mx-auto max-h-[92vh] overflow-hidden"
+            className="fixed bottom-0 left-0 right-0 bg-[var(--card-bg)] rounded-t-3xl p-4 z-50 shadow-[var(--shadow-elevated)] border-t border-[var(--border-color)] max-w-4xl mx-auto max-h-[92vh] overflow-hidden"
           >
             {/* Drag Handle — the only drag-initiating surface */}
             <div
               onPointerDown={(e) => dragControls.start(e)}
               className="w-full flex justify-center pt-1 pb-3 -mt-1 cursor-grab active:cursor-grabbing touch-none"
             >
-              <div className="w-12 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full" />
+              <div className="w-12 h-1.5 bg-[var(--text-muted)]/40 rounded-full transition-colors" />
             </div>
             {children}
           </motion.div>

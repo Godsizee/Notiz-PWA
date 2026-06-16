@@ -240,8 +240,8 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-[var(--background)] pb-28 relative overflow-hidden transition-colors duration-300">
       {/* Dynamic ambient color glows */}
-      <div className="absolute top-[-30%] right-[-10%] w-[600px] h-[600px] rounded-full bg-primary/3 blur-[140px] pointer-events-none" />
-      <div className="absolute bottom-[-10%] left-[-20%] w-[600px] h-[600px] rounded-full bg-purple-500/3 blur-[140px] pointer-events-none" />
+      <div className="absolute top-[-30%] right-[-10%] w-[600px] h-[600px] rounded-full blur-[140px] pointer-events-none" style={{ background: "var(--glow-a)" }} />
+      <div className="absolute bottom-[-10%] left-[-20%] w-[600px] h-[600px] rounded-full blur-[140px] pointer-events-none" style={{ background: "var(--glow-b)" }} />
 
       <Header />
 
