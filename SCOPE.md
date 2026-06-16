@@ -1,7 +1,7 @@
 # Scope – Notiz-PWA
 
-> **Version:** 1.0  
-> **Stand:** Juni 2026  
+> **Version:** 1.1  
+> **Stand:** 16. Juni 2026  
 > **Zielgruppe:** 2 private Nutzer (kein öffentlicher Zugang)
 
 ---
@@ -42,19 +42,38 @@ Einfache, private Notiz-App ähnlich Google Keep. Fokus auf schnelle Erfassung v
 
 ---
 
+## ✅ Scope-Erweiterung v1.1 (16.06.2026)
+
+### UX-Upgrade
+
+- **Notiz-Farben** – Farbliche Kennzeichnung von Notizen (Palette im Editor)
+- **Archivierung** – Notizen archivieren statt löschen
+- **Filterung** – Quick-Filter nach Typ (Notiz/Checkliste), Farbe, Archiviert
+- **Drag-Reorder** – Checklist-Items per Drag-and-Drop umsortieren
+- **Swipe-Gesten** – Swipe-to-Dismiss (BottomSheet), Swipe-Actions (NoteCards)
+- **Undo-Delete** – Soft-Delete mit 5s Undo-Toast
+- **Haptic Feedback** – Taktile Rückmeldung auf Mobilgeräten
+- **Skeleton Loading** – Shimmer-Platzhalter beim Initial-Load
+- **Keyboard Shortcuts** – Desktop-Shortcuts (N, L, Escape)
+
+### Realtime-Presence (Phase 6)
+
+- **Live-Presence** – "Claudia bearbeitet gerade" Indikator in Checklisten
+- Erfordert neue PocketBase Collection `presence`
+- Kein kollaboratives Editing, nur Awareness
+
+---
+
 ## ❌ Explizit NICHT im Scope
 
 Diese Features werden **nicht** umgesetzt – auch nicht auf Wunsch, solange der Scope nicht offiziell erweitert wird:
 
-- Geteilte Notizen zwischen den zwei Nutzern
-- Farben, Labels oder Tags für Notizen
+- Labels oder Tags für Notizen
 - Bilder, Anhänge oder Datei-Uploads
 - Erinnerungen / Benachrichtigungen
-- Sortierung oder Filterung der Notizen
 - Suchabfragen / Volltext-Suche
 - Markdown- oder Rich-Text-Formatierung
 - Mehrere Listen innerhalb einer Notiz
-- Archivierung oder Papierkorb-Funktion
 - Kollaboratives Bearbeiten / Echtzeit-Sync
 - Öffentliche Freigabe von Notizen
 - Admin-Bereich oder Nutzerverwaltung in der App

@@ -51,13 +51,14 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({ success: true }, { status: 201 });
-  } catch (err: any) {
-    console.error("Registration error:", err?.response || err);
-    
+  } catch (err: unknown) {
     const pbErr = err as {
       status?: number;
+      message?: string;
+      response?: unknown;
       data?: { data?: Record<string, { message: string }> };
     };
+    console.error("Registration error:", pbErr?.response || err);
 
     if (pbErr.status === 400 && pbErr.data?.data?.email) {
       return NextResponse.json(
@@ -67,7 +68,7 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json(
-      { error: `Registrierung fehlgeschlagen: ${err?.message || "Unbekannter Fehler"}` },
+      { error: `Registrierung fehlgeschlagen: ${pbErr?.message || "Unbekannter Fehler"}` },
       { status: 500 }
     );
   }

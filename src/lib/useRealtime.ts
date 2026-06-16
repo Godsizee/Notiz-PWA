@@ -1,24 +1,27 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { pb } from '@/lib/pb';
 import { RecordModel } from 'pocketbase';
 
 export function useRealtimeNotes() {
   const [notes, setNotes] = useState<RecordModel[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Manual fetch — reused for the initial load and for pull-to-refresh.
+  const refetch = useCallback(async () => {
+    try {
+      const records = await pb.collection('notes').getFullList({
+        sort: '-created',
+      });
+      setNotes(records);
+    } catch (err) {
+      console.error("Failed to fetch notes:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    // Initial fetch
-    const fetchNotes = async () => {
-      try {
-        const records = await pb.collection('notes').getFullList({
-          sort: '-created',
-        });
-        setNotes(records);
-      } catch (err) {
-        console.error("Failed to fetch notes:", err);
-      }
-    };
-
-    fetchNotes();
+    refetch();
 
     // Subscribe to realtime updates
     pb.collection('notes').subscribe('*', function (e) {
@@ -34,9 +37,9 @@ export function useRealtimeNotes() {
     return () => {
       pb.collection('notes').unsubscribe('*');
     };
-  }, []);
+  }, [refetch]);
 
-  return { notes, setNotes };
+  return { notes, setNotes, isLoading, refetch };
 }
 
 export function useRealtimeChecklist(noteId: string) {

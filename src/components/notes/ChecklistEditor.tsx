@@ -1,17 +1,111 @@
+"use client";
+
 import { useState, useEffect, useRef } from 'react';
 import { RecordModel } from 'pocketbase';
 import { pb } from '@/lib/pb';
-import { Palette, Pin, Archive, Trash2, Plus, X, CheckCircle2, Circle, Check, RefreshCw, MoreVertical, RotateCcw } from 'lucide-react';
+import { Palette, Pin, Archive, Trash2, Plus, X, CheckCircle2, Circle, Check, RefreshCw, MoreVertical, RotateCcw, GripVertical } from 'lucide-react';
 import { useRealtimeChecklist } from '@/lib/useRealtime';
+import { usePresence } from '@/lib/usePresence';
 import { getNoteColorStyles, NOTE_COLORS } from '@/lib/colors';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, Reorder, useDragControls } from 'framer-motion';
+import { hapticLight } from '@/lib/haptics';
 
 interface ChecklistEditorProps {
   note?: RecordModel | null;
   onClose: () => void;
+  /** When provided, deleting routes through the app's soft-delete + undo toast. */
+  onRequestDelete?: (noteId: string) => void;
 }
 
-export default function ChecklistEditor({ note, onClose }: ChecklistEditorProps) {
+// A single reorderable active item. Drag is restricted to the grip handle so
+// the text input and checkbox stay tappable.
+interface ActiveRowProps {
+  item: RecordModel;
+  isCompletedVisual: boolean;
+  iconClass: string;
+  registerRef: (id: string, el: HTMLInputElement | null) => void;
+  onToggle: (id: string, current: boolean) => void;
+  onUpdateText: (id: string, text: string) => void;
+  onDelete: (id: string) => void;
+  onEnter: (item: RecordModel) => void;
+  onBackspaceEmpty: (item: RecordModel) => void;
+}
+
+function ActiveChecklistRow({
+  item,
+  isCompletedVisual,
+  iconClass,
+  registerRef,
+  onToggle,
+  onUpdateText,
+  onDelete,
+  onEnter,
+  onBackspaceEmpty,
+}: ActiveRowProps) {
+  const controls = useDragControls();
+
+  return (
+    <Reorder.Item
+      value={item}
+      dragListener={false}
+      dragControls={controls}
+      whileDrag={{ scale: 1.02, boxShadow: '0 10px 30px -12px rgba(0,0,0,0.35)' }}
+      className="flex items-center gap-2 group py-1.5 bg-transparent rounded-xl"
+    >
+      {/* Drag handle */}
+      <button
+        onPointerDown={(e) => controls.start(e)}
+        className="touch-none cursor-grab active:cursor-grabbing text-[var(--text-muted)]/30 hover:text-[var(--text-muted)] transition-colors shrink-0 p-0.5"
+        title="Zum Sortieren ziehen"
+        aria-label="Eintrag verschieben"
+      >
+        <GripVertical className="w-4 h-4" />
+      </button>
+
+      {/* Checkbox */}
+      <button
+        onClick={() => onToggle(item.id, item.is_completed)}
+        className="checkbox-animation text-[var(--text-muted)]/40 hover:text-primary transition-colors cursor-pointer shrink-0"
+      >
+        {isCompletedVisual ? (
+          <CheckCircle2 className={`w-5 h-5 ${iconClass}`} />
+        ) : (
+          <Circle className="w-5 h-5" />
+        )}
+      </button>
+
+      {/* Text field */}
+      <input
+        ref={(el) => registerRef(item.id, el)}
+        type="text"
+        className={`flex-1 bg-transparent border-none outline-none text-base md:text-lg text-[var(--text-primary)] transition-all ${isCompletedVisual ? 'line-through text-[var(--text-muted)]/60' : ''}`}
+        value={item.text}
+        onChange={(e) => onUpdateText(item.id, e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            onEnter(item);
+          }
+          if (e.key === 'Backspace' && item.text === '') {
+            e.preventDefault();
+            onBackspaceEmpty(item);
+          }
+        }}
+      />
+
+      {/* Delete cross */}
+      <button
+        onClick={() => onDelete(item.id)}
+        className="opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-red-500 transition-all cursor-pointer p-1 shrink-0"
+        title="Eintrag entfernen"
+      >
+        <X className="w-4 h-4" />
+      </button>
+    </Reorder.Item>
+  );
+}
+
+export default function ChecklistEditor({ note, onClose, onRequestDelete }: ChecklistEditorProps) {
   const [title, setTitle] = useState(note?.title || '');
   const [color, setColor] = useState(note?.color || 'white');
   const [isPinned, setIsPinned] = useState(note?.is_pinned || false);
@@ -21,12 +115,20 @@ export default function ChecklistEditor({ note, onClose }: ChecklistEditorProps)
   const [activeNoteId, setActiveNoteId] = useState<string | undefined>(note?.id);
   const [newItemText, setNewItemText] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  
+  const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
+
   // Local state for 450ms Visual Checkbox-Delay Engine
   const [togglingItems, setTogglingItems] = useState<Record<string, { is_completed: boolean; timer: NodeJS.Timeout }>>({});
 
-  const { items } = useRealtimeChecklist(activeNoteId || '');
+  const { items, setItems } = useRealtimeChecklist(activeNoteId || '');
+  const { others } = usePresence(activeNoteId);
   const newItemInputRef = useRef<HTMLInputElement>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const itemInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  const registerRef = (id: string, el: HTMLInputElement | null) => {
+    itemInputRefs.current[id] = el;
+  };
 
   // Clean up timers on unmount
   useEffect(() => {
@@ -35,10 +137,20 @@ export default function ChecklistEditor({ note, onClose }: ChecklistEditorProps)
     };
   }, [togglingItems]);
 
+  // Focus an item input once it actually exists in the synced list (used by
+  // the Enter-insert and Backspace-delete focus chain).
+  useEffect(() => {
+    if (!pendingFocusId) return;
+    const el = itemInputRefs.current[pendingFocusId];
+    if (el) {
+      el.focus();
+      setPendingFocusId(null);
+    }
+  }, [items, pendingFocusId]);
+
   // Debounced auto-save for note properties (title, color, pinned, archived)
   useEffect(() => {
     const saveNote = async () => {
-      // Don't save if it's completely empty and hasn't been created yet
       if (!activeNoteId && !title.trim()) return;
 
       const user = pb.authStore.model || pb.authStore.record;
@@ -72,7 +184,7 @@ export default function ChecklistEditor({ note, onClose }: ChecklistEditorProps)
 
   const ensureNoteExists = async () => {
     if (activeNoteId) return activeNoteId;
-    
+
     const user = pb.authStore.model || pb.authStore.record;
     const record = await pb.collection('notes').create({
       title: title || 'Unbenannte Liste',
@@ -86,6 +198,8 @@ export default function ChecklistEditor({ note, onClose }: ChecklistEditorProps)
     return record.id;
   };
 
+  const nextOrder = () => items.reduce((max, i) => Math.max(max, i.order ?? 0), -1) + 1;
+
   const handleAddItem = async () => {
     if (!newItemText.trim()) return;
     const noteId = await ensureNoteExists();
@@ -95,19 +209,52 @@ export default function ChecklistEditor({ note, onClose }: ChecklistEditorProps)
         note: noteId,
         text: newItemText,
         is_completed: false,
-        order: items.length,
+        order: nextOrder(),
       });
       setNewItemText('');
-      // Refocus automatically to let mobile/desktop users quickly add more items
-      setTimeout(() => {
-        newItemInputRef.current?.focus();
-      }, 50);
+      setTimeout(() => newItemInputRef.current?.focus(), 50);
     } catch (err) {
       console.error("Failed to add checklist item:", err);
     }
   };
 
+  // Enter on an existing item → insert a new empty item directly below it,
+  // using a fractional order so no bulk reindex is needed, then focus it.
+  const handleInsertBelow = async (currentItem: RecordModel) => {
+    const noteId = await ensureNoteExists();
+    const idx = activeItems.findIndex(i => i.id === currentItem.id);
+    const next = activeItems[idx + 1];
+    const curOrder = currentItem.order ?? 0;
+    const newOrder = next ? (curOrder + (next.order ?? curOrder + 2)) / 2 : curOrder + 1;
+
+    try {
+      const record = await pb.collection('checklist_items').create({
+        note: noteId,
+        text: '',
+        is_completed: false,
+        order: newOrder,
+      });
+      setPendingFocusId(record.id);
+    } catch (err) {
+      console.error("Failed to insert checklist item:", err);
+    }
+  };
+
+  // Backspace on an empty item → delete it and focus the previous item.
+  const handleBackspaceEmpty = (item: RecordModel) => {
+    const idx = activeItems.findIndex(i => i.id === item.id);
+    const prev = activeItems[idx - 1];
+    handleDeleteItem(item.id);
+    if (prev) {
+      setPendingFocusId(prev.id);
+    } else {
+      titleInputRef.current?.focus();
+    }
+  };
+
   const handleUpdateItem = async (itemId: string, text: string) => {
+    // Optimistic local update keeps the input responsive between realtime echoes.
+    setItems(prev => prev.map(i => (i.id === itemId ? { ...i, text } : i)));
     try {
       await pb.collection('checklist_items').update(itemId, { text });
     } catch (err) {
@@ -115,11 +262,26 @@ export default function ChecklistEditor({ note, onClose }: ChecklistEditorProps)
     }
   };
 
-  // 450ms Visual Checkbox-Delay Engine Implementation
-  // Instantly marks checked state locally to trigger checkboxes animation and text strikethrough,
-  // then schedules a 450ms timeout before updating PocketBase. This halts abrupt list jumps.
+  // Drag-reorder: optimistic local order update, then persist changed orders.
+  const handleReorder = (newOrder: RecordModel[]) => {
+    hapticLight();
+    setItems(prev => {
+      const completed = prev.filter(i => i.is_completed);
+      const reordered = newOrder.map((it, idx) => ({ ...it, order: idx }));
+      return [...reordered, ...completed];
+    });
+    newOrder.forEach((it, idx) => {
+      if ((it.order ?? -1) !== idx) {
+        pb.collection('checklist_items')
+          .update(it.id, { order: idx })
+          .catch(err => console.error("Failed to persist reorder:", err));
+      }
+    });
+  };
+
+  // 450ms Visual Checkbox-Delay Engine
   const handleToggleItem = (itemId: string, currentStatus: boolean) => {
-    // If already in toggling state, clicking again cancels the timer (reverts instantly)
+    hapticLight();
     if (togglingItems[itemId]) {
       clearTimeout(togglingItems[itemId].timer);
       setTogglingItems(prev => {
@@ -131,14 +293,13 @@ export default function ChecklistEditor({ note, onClose }: ChecklistEditorProps)
     }
 
     const targetStatus = !currentStatus;
-    
+
     const timer = setTimeout(async () => {
       try {
         await pb.collection('checklist_items').update(itemId, {
           is_completed: targetStatus
         });
-        
-        // Remove from toggling state once DB is updated and realtime subscription is on its way
+
         setTogglingItems(prev => {
           const next = { ...prev };
           delete next[itemId];
@@ -146,14 +307,13 @@ export default function ChecklistEditor({ note, onClose }: ChecklistEditorProps)
         });
       } catch (err) {
         console.error("Failed to save checked status:", err);
-        // Clean up on error to revert visual state
         setTogglingItems(prev => {
           const next = { ...prev };
           delete next[itemId];
           return next;
         });
       }
-    }, 450); // 450ms delay for ideal visual transition feel
+    }, 450);
 
     setTogglingItems(prev => ({
       ...prev,
@@ -169,24 +329,26 @@ export default function ChecklistEditor({ note, onClose }: ChecklistEditorProps)
     }
   };
 
-  const handleDeleteNote = async () => {
+  const handleDeleteNote = () => {
+    // Route through the app-level soft-delete + undo toast when available.
+    if (activeNoteId && onRequestDelete) {
+      onRequestDelete(activeNoteId);
+      return;
+    }
     if (activeNoteId) {
-      try {
-        await pb.collection('notes').delete(activeNoteId);
-      } catch (err) {
-        console.error("Failed to delete note:", err);
-      }
+      pb.collection('notes').delete(activeNoteId).catch(err =>
+        console.error("Failed to delete note:", err)
+      );
     }
     onClose();
   };
 
-  // BULK ACTIONS:
-  // 1. Alle Haken entfernen (Reset for repetitive shopping trips)
+  // BULK ACTIONS
   const handleResetAll = async () => {
     setShowBulkMenu(false);
     if (!activeNoteId) return;
     try {
-      const promises = completedItems.map(item => 
+      const promises = completedItems.map(item =>
         pb.collection('checklist_items').update(item.id, { is_completed: false })
       );
       await Promise.all(promises);
@@ -195,12 +357,11 @@ export default function ChecklistEditor({ note, onClose }: ChecklistEditorProps)
     }
   };
 
-  // 2. Abgehakte löschen (Clear away checked items)
   const handleDeleteCompleted = async () => {
     setShowBulkMenu(false);
     if (!activeNoteId) return;
     try {
-      const promises = completedItems.map(item => 
+      const promises = completedItems.map(item =>
         pb.collection('checklist_items').delete(item.id)
       );
       await Promise.all(promises);
@@ -209,21 +370,51 @@ export default function ChecklistEditor({ note, onClose }: ChecklistEditorProps)
     }
   };
 
-  // Filter items: items remain in their original filtered lists during the 450ms delay,
-  // guaranteeing no list-shifting occurs until the database resolves the state.
-  const activeItems = items.filter(i => !i.is_completed).sort((a, b) => a.order - b.order);
-  const completedItems = items.filter(i => i.is_completed).sort((a, b) => a.order - b.order);
-  
+  const activeItems = items.filter(i => !i.is_completed).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const completedItems = items.filter(i => i.is_completed).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
   const colorStyles = getNoteColorStyles(color);
 
   return (
-    <div 
+    <div
       className="flex flex-col h-full min-h-[60vh] rounded-t-3xl transition-colors duration-300 relative"
       style={colorStyles.style}
     >
       {/* Title Header */}
       <div className="p-6 pb-2">
+        {/* Realtime presence — shows collaborators currently viewing this list */}
+        <AnimatePresence>
+          {others.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              className="flex items-center gap-2 mb-2"
+            >
+              <div className="flex -space-x-2">
+                {others.map((p) => {
+                  const email: string = p.expand?.user?.email || '?';
+                  return (
+                    <div
+                      key={p.id}
+                      title={`${email} bearbeitet gerade`}
+                      className="w-6 h-6 rounded-full bg-gradient-to-tr from-primary to-purple-500 text-white flex items-center justify-center text-[10px] font-bold border border-[var(--card-bg)] shadow-sm"
+                    >
+                      {email[0]?.toUpperCase()}
+                    </div>
+                  );
+                })}
+              </div>
+              <span className="flex items-center gap-1.5 text-[10px] font-bold text-green-500 uppercase tracking-wider">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                Bearbeitet gerade
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <input
+          ref={titleInputRef}
           type="text"
           placeholder="Titel der Liste"
           className="w-full text-2xl font-extrabold bg-transparent border-none outline-none text-[var(--text-primary)] placeholder-[var(--text-muted)]/40"
@@ -240,69 +431,33 @@ export default function ChecklistEditor({ note, onClose }: ChecklistEditorProps)
 
       {/* Checklist Body (Scrollable) */}
       <div className="flex-1 overflow-y-auto px-6 space-y-1 pb-32">
-        
-        {/* Active Items list */}
-        <AnimatePresence initial={false}>
+
+        {/* Active Items list (reorderable) */}
+        <Reorder.Group axis="y" values={activeItems} onReorder={handleReorder} className="space-y-1">
           {activeItems.map((item) => {
-            // Read visual status based on toggling state
             const isCompletedVisual = togglingItems[item.id] !== undefined
               ? togglingItems[item.id].is_completed
               : item.is_completed;
 
             return (
-              <motion.div
+              <ActiveChecklistRow
                 key={item.id}
-                layout
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="flex items-center gap-3 group py-1.5"
-              >
-                {/* Tactical Checkbox Button */}
-                <button 
-                  onClick={() => handleToggleItem(item.id, item.is_completed)}
-                  className="checkbox-animation text-[var(--text-muted)]/40 hover:text-primary transition-colors cursor-pointer shrink-0"
-                >
-                  {isCompletedVisual ? (
-                    <CheckCircle2 className={`w-5 h-5 ${colorStyles.icon}`} />
-                  ) : (
-                    <Circle className="w-5 h-5" />
-                  )}
-                </button>
-
-                {/* Item Text field */}
-                <input
-                  type="text"
-                  className={`flex-1 bg-transparent border-none outline-none text-base md:text-lg text-[var(--text-primary)] transition-all ${isCompletedVisual ? 'line-through text-[var(--text-muted)]/60' : ''}`}
-                  value={item.text}
-                  onChange={(e) => handleUpdateItem(item.id, e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      newItemInputRef.current?.focus();
-                    }
-                    if (e.key === 'Backspace' && item.text === '') {
-                      e.preventDefault();
-                      handleDeleteItem(item.id);
-                    }
-                  }}
-                />
-
-                {/* Single Delete Cross */}
-                <button 
-                  onClick={() => handleDeleteItem(item.id)}
-                  className="opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-red-500 transition-all cursor-pointer p-1"
-                  title="Eintrag entfernen"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </motion.div>
+                item={item}
+                isCompletedVisual={isCompletedVisual}
+                iconClass={colorStyles.icon}
+                registerRef={registerRef}
+                onToggle={handleToggleItem}
+                onUpdateText={handleUpdateItem}
+                onDelete={handleDeleteItem}
+                onEnter={handleInsertBelow}
+                onBackspaceEmpty={handleBackspaceEmpty}
+              />
             );
           })}
-        </AnimatePresence>
+        </Reorder.Group>
 
         {/* Quick Add Row */}
-        <div className="flex items-center gap-3 py-2 border-t border-[var(--border-color)]">
+        <div className="flex items-center gap-3 py-2 border-t border-[var(--border-color)] mt-1">
           <div className="w-5 h-5 flex items-center justify-center text-[var(--text-muted)]/30 shrink-0">
             <Plus className="w-4.5 h-4.5" />
           </div>
@@ -330,7 +485,7 @@ export default function ChecklistEditor({ note, onClose }: ChecklistEditorProps)
               Erledigt ({completedItems.length})
               <span className="h-[1px] flex-1 bg-[var(--border-color)]"></span>
             </h4>
-            
+
             <div className="space-y-1 opacity-70">
               <AnimatePresence initial={false}>
                 {completedItems.map((item) => {
@@ -339,7 +494,7 @@ export default function ChecklistEditor({ note, onClose }: ChecklistEditorProps)
                     : item.is_completed;
 
                   return (
-                    <motion.div 
+                    <motion.div
                       key={item.id}
                       layout
                       initial={{ opacity: 0, y: 10 }}
@@ -347,9 +502,8 @@ export default function ChecklistEditor({ note, onClose }: ChecklistEditorProps)
                       exit={{ opacity: 0, scale: 0.95 }}
                       className="flex items-center gap-3 py-1.5 group"
                     >
-                      {/* Checkbox */}
-                      <button 
-                        onClick={() => handleToggleItem(item.id, item.is_completed)} 
+                      <button
+                        onClick={() => handleToggleItem(item.id, item.is_completed)}
                         className={`checkbox-animation transition-colors cursor-pointer shrink-0 ${colorStyles.icon}`}
                       >
                         {isCompletedVisual ? (
@@ -358,15 +512,13 @@ export default function ChecklistEditor({ note, onClose }: ChecklistEditorProps)
                           <Circle className="w-5 h-5 text-[var(--text-muted)]/40" />
                         )}
                       </button>
-                      
-                      {/* Text */}
+
                       <span className={`flex-1 text-base md:text-lg text-[var(--text-primary)] transition-all ${isCompletedVisual ? 'line-through text-[var(--text-muted)]/60' : ''}`}>
                         {item.text}
                       </span>
-                      
-                      {/* Delete */}
-                      <button 
-                        onClick={() => handleDeleteItem(item.id)} 
+
+                      <button
+                        onClick={() => handleDeleteItem(item.id)}
                         className="opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-red-500 transition-all cursor-pointer p-1"
                         title="Eintrag löschen"
                       >
@@ -383,23 +535,21 @@ export default function ChecklistEditor({ note, onClose }: ChecklistEditorProps)
 
       {/* Floating Design & Bulk Action Toolbar */}
       <div className="absolute bottom-6 left-6 right-6 h-14 bg-card/85 backdrop-blur-xl border border-[var(--border-color)] rounded-2xl shadow-2xl flex items-center justify-between px-4 z-50">
-        
+
         {/* Left Actions */}
         <div className="flex items-center gap-3.5 relative">
-          
-          {/* Palette button */}
-          <button 
-            onClick={() => { setShowPalette(!showPalette); setShowBulkMenu(false); }} 
+
+          <button
+            onClick={() => { setShowPalette(!showPalette); setShowBulkMenu(false); }}
             className="w-10 h-10 rounded-xl hover:bg-[var(--background)]/80 flex items-center justify-center transition-colors text-[var(--text-secondary)] cursor-pointer"
             title="Farbe ändern"
           >
             <Palette size={19} />
           </button>
-          
-          {/* Color choice popover */}
+
           <AnimatePresence>
             {showPalette && (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, y: 10, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 10, scale: 0.95 }}
@@ -424,18 +574,16 @@ export default function ChecklistEditor({ note, onClose }: ChecklistEditorProps)
 
           <div className="h-6 w-[1px] bg-[var(--border-color)] mx-0.5"></div>
 
-          {/* Pin Button */}
-          <button 
-            onClick={() => setIsPinned(!isPinned)} 
+          <button
+            onClick={() => setIsPinned(!isPinned)}
             className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors cursor-pointer ${isPinned ? 'bg-primary/10 text-primary' : 'text-[var(--text-secondary)] hover:bg-[var(--background)]/80'}`}
             title="Liste anpinnen"
           >
             <Pin size={19} className={isPinned ? 'fill-current' : ''} />
           </button>
-          
-          {/* Archive Button */}
-          <button 
-            onClick={() => setIsArchived(!isArchived)} 
+
+          <button
+            onClick={() => setIsArchived(!isArchived)}
             className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors cursor-pointer ${isArchived ? 'bg-orange-500/10 text-orange-500' : 'text-[var(--text-secondary)] hover:bg-[var(--background)]/80'}`}
             title="Archivieren"
           >
@@ -445,8 +593,7 @@ export default function ChecklistEditor({ note, onClose }: ChecklistEditorProps)
 
         {/* Right Actions, Status & Bulk menu */}
         <div className="flex items-center gap-3 relative">
-          
-          {/* Save Status Indicator */}
+
           <div className="flex items-center gap-1.5 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider bg-[var(--background)]/50 px-2.5 py-1 rounded-full border border-[var(--border-color)]">
             {isSaving ? (
               <>
@@ -463,8 +610,7 @@ export default function ChecklistEditor({ note, onClose }: ChecklistEditorProps)
 
           <div className="h-6 w-[1px] bg-[var(--border-color)] mx-0.5"></div>
 
-          {/* Bulk Action Toggle Button */}
-          <button 
+          <button
             onClick={() => { setShowBulkMenu(!showBulkMenu); setShowPalette(false); }}
             className={`w-10 h-10 rounded-xl hover:bg-[var(--background)]/80 flex items-center justify-center transition-colors cursor-pointer ${showBulkMenu ? 'bg-primary/10 text-primary' : 'text-[var(--text-secondary)]'}`}
             title="Aktionen"
@@ -472,7 +618,6 @@ export default function ChecklistEditor({ note, onClose }: ChecklistEditorProps)
             <MoreVertical size={19} />
           </button>
 
-          {/* Bulk Dropdown Popover */}
           <AnimatePresence>
             {showBulkMenu && (
               <motion.div
@@ -481,7 +626,6 @@ export default function ChecklistEditor({ note, onClose }: ChecklistEditorProps)
                 exit={{ opacity: 0, y: 10, scale: 0.95 }}
                 className="absolute bottom-16 right-0 bg-card border border-[var(--border-color)] shadow-2xl rounded-2xl p-2 flex flex-col gap-1 z-[60] min-w-[200px]"
               >
-                {/* Reset Action */}
                 <button
                   onClick={handleResetAll}
                   disabled={completedItems.length === 0}
@@ -491,7 +635,6 @@ export default function ChecklistEditor({ note, onClose }: ChecklistEditorProps)
                   <span>Alle Haken entfernen</span>
                 </button>
 
-                {/* Delete Checked Action */}
                 <button
                   onClick={handleDeleteCompleted}
                   disabled={completedItems.length === 0}
@@ -506,9 +649,8 @@ export default function ChecklistEditor({ note, onClose }: ChecklistEditorProps)
 
           <div className="h-6 w-[1px] bg-[var(--border-color)] mx-0.5"></div>
 
-          {/* Delete List Button */}
-          <button 
-            onClick={handleDeleteNote} 
+          <button
+            onClick={handleDeleteNote}
             className="w-10 h-10 rounded-xl hover:bg-red-500/10 flex items-center justify-center text-red-500 transition-colors cursor-pointer"
             title="Liste löschen"
           >

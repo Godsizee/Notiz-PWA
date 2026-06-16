@@ -1,30 +1,55 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Masonry from "react-masonry-css";
 import { useRouter } from "next/navigation";
 import { RecordModel } from "pocketbase";
 import { pb } from "@/lib/pb";
 import { useRealtimeNotes } from "@/lib/useRealtime";
+import { useKeyboardShortcuts } from "@/lib/useKeyboardShortcuts";
+import { useToastStore } from "@/store/useToastStore";
+import { getNoteColorStyles } from "@/lib/colors";
+import { hapticLight, hapticHeavy } from "@/lib/haptics";
 import NoteCard from "@/components/notes/NoteCard";
+import NoteCardSkeleton from "@/components/notes/NoteCardSkeleton";
 import FAB from "@/components/ui/FAB";
 import BottomSheet from "@/components/ui/BottomSheet";
+import FilterBar, { type NoteFilter } from "@/components/ui/FilterBar";
+import PullToRefresh from "@/components/ui/PullToRefresh";
+import Toast from "@/components/ui/Toast";
 import NoteEditor from "@/components/notes/NoteEditor";
 import ChecklistEditor from "@/components/notes/ChecklistEditor";
-import { FileText, ListTodo, Layout } from "lucide-react";
+import { Layout, SearchX } from "lucide-react";
 import Header from "@/components/ui/Header";
 import { motion } from "framer-motion";
 
+const UNDO_DELETE_MS = 5000;
+
+const breakpointColumnsObj = {
+  default: 3,
+  1100: 3,
+  768: 2,
+  500: 1,
+};
+
 export default function Home() {
-  const { notes } = useRealtimeNotes();
+  const { notes, isLoading, refetch } = useRealtimeNotes();
   const router = useRouter();
+  const showToast = useToastStore((s) => s.showToast);
 
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [activeNote, setActiveNote] = useState<RecordModel | null>(null);
-  const [editorType, setEditorType] = useState<'text' | 'checklist' | null>(null);
+  const [editorType, setEditorType] = useState<"text" | "checklist" | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
-  // Corrected Auth Check via useEffect lifecycle
+  const [activeFilter, setActiveFilter] = useState<NoteFilter>("all");
+  const [activeColor, setActiveColor] = useState<string | null>(null);
+
+  // Soft-delete: ids hidden from the UI while their undo window is open.
+  const [pendingDeleteIds, setPendingDeleteIds] = useState<Set<string>>(new Set());
+  const deleteTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  // Auth check
   useEffect(() => {
     if (!pb.authStore.isValid) {
       router.push("/login");
@@ -34,6 +59,125 @@ export default function Home() {
       setIsCheckingAuth(false);
     }
   }, [router]);
+
+  // Clear any outstanding delete timers on unmount.
+  useEffect(() => {
+    const timers = deleteTimers.current;
+    return () => {
+      Object.values(timers).forEach(clearTimeout);
+    };
+  }, []);
+
+  const openText = () => {
+    setActiveNote(null);
+    setEditorType("text");
+    setIsSheetOpen(true);
+  };
+
+  const openChecklist = () => {
+    setActiveNote(null);
+    setEditorType("checklist");
+    setIsSheetOpen(true);
+  };
+
+  const openNote = (note: RecordModel) => {
+    setActiveNote(note);
+    setEditorType(note.type as "text" | "checklist");
+    setIsSheetOpen(true);
+  };
+
+  const closeSheet = () => {
+    setIsSheetOpen(false);
+    setTimeout(() => {
+      setActiveNote(null);
+      setEditorType(null);
+    }, 300);
+  };
+
+  // --- Note mutations (used by swipe + context menu) ---
+  const handleTogglePin = async (note: RecordModel) => {
+    try {
+      await pb.collection("notes").update(note.id, { is_pinned: !note.is_pinned });
+    } catch (err) {
+      console.error("Failed to toggle pin:", err);
+    }
+  };
+
+  const handleToggleArchive = async (note: RecordModel) => {
+    try {
+      await pb.collection("notes").update(note.id, { is_archived: !note.is_archived });
+    } catch (err) {
+      console.error("Failed to toggle archive:", err);
+    }
+  };
+
+  const handleChangeColor = async (note: RecordModel, color: string) => {
+    try {
+      await pb.collection("notes").update(note.id, { color });
+    } catch (err) {
+      console.error("Failed to change color:", err);
+    }
+  };
+
+  // Soft-delete with a 5s undo window before the real PocketBase delete.
+  const requestDeleteNote = (noteId: string) => {
+    hapticHeavy();
+    setPendingDeleteIds((prev) => new Set(prev).add(noteId));
+
+    const timer = setTimeout(async () => {
+      try {
+        await pb.collection("notes").delete(noteId);
+      } catch (err) {
+        console.error("Failed to delete note:", err);
+      }
+      delete deleteTimers.current[noteId];
+      setPendingDeleteIds((prev) => {
+        const next = new Set(prev);
+        next.delete(noteId);
+        return next;
+      });
+    }, UNDO_DELETE_MS);
+    deleteTimers.current[noteId] = timer;
+
+    showToast({
+      message: "Notiz gelöscht",
+      actionLabel: "Rückgängig",
+      tone: "danger",
+      duration: UNDO_DELETE_MS,
+      onAction: () => {
+        const t = deleteTimers.current[noteId];
+        if (t) {
+          clearTimeout(t);
+          delete deleteTimers.current[noteId];
+        }
+        setPendingDeleteIds((prev) => {
+          const next = new Set(prev);
+          next.delete(noteId);
+          return next;
+        });
+        hapticLight();
+      },
+    });
+  };
+
+  // Delete requested from inside an open editor → close sheet then soft-delete.
+  const requestDeleteFromEditor = (noteId: string) => {
+    closeSheet();
+    requestDeleteNote(noteId);
+  };
+
+  // Keyboard shortcuts (desktop)
+  useKeyboardShortcuts({
+    onNewNote: openText,
+    onNewChecklist: openChecklist,
+    onEscape: () => {
+      if (isSheetOpen) closeSheet();
+    },
+    onDeleteInEditor: () => {
+      if (activeNote) requestDeleteFromEditor(activeNote.id);
+    },
+    isEditing: isSheetOpen && !!activeNote,
+  });
 
   if (isCheckingAuth) {
     return (
@@ -48,40 +192,50 @@ export default function Home() {
     );
   }
 
-  // Responsive breakpoints for masonry grid
-  const breakpointColumnsObj = {
-    default: 3,
-    1100: 3,
-    768: 2,
-    500: 1
-  };
+  // Colors actually used (for the color filter chips).
+  const usedColors = Array.from(
+    new Set(
+      notes
+        .filter((n) => !pendingDeleteIds.has(n.id) && n.color)
+        .map((n) => n.color as string)
+    )
+  );
 
-  const openNote = (note: RecordModel) => {
-    setActiveNote(note);
-    setEditorType(note.type as 'text' | 'checklist');
-    setIsSheetOpen(true);
-  };
-
-  const closeSheet = () => {
-    setIsSheetOpen(false);
-    // Slight delay before resetting state to allow bottom sheet slide-down animation to complete smoothly
-    setTimeout(() => {
-      setActiveNote(null);
-      setEditorType(null);
-    }, 300);
-  };
-
-  // Sort notes: pinned notes always first, then by creation date. Hide archived notes.
-  const visibleNotes = notes
-    .filter(n => !n.is_archived)
+  // Apply filters.
+  const filteredNotes = notes
+    .filter((n) => !pendingDeleteIds.has(n.id))
+    .filter((n) => {
+      if (activeFilter === "archived") return n.is_archived;
+      if (n.is_archived) return false;
+      if (activeFilter === "text") return n.type === "text";
+      if (activeFilter === "checklist") return n.type === "checklist";
+      return true;
+    })
+    .filter((n) => {
+      if (!activeColor) return true;
+      return getNoteColorStyles(n.color).id === getNoteColorStyles(activeColor).id;
+    })
     .sort((a, b) => {
       if (a.is_pinned && !b.is_pinned) return -1;
       if (!a.is_pinned && b.is_pinned) return 1;
       return new Date(b.created).getTime() - new Date(a.created).getTime();
     });
 
-  const pinnedNotesCount = visibleNotes.filter(n => n.is_pinned).length;
-  const regularNotesCount = visibleNotes.length - pinnedNotesCount;
+  const pinnedNotes = filteredNotes.filter((n) => n.is_pinned);
+  const regularNotes = filteredNotes.filter((n) => !n.is_pinned);
+  const hasAnyNotes = notes.filter((n) => !pendingDeleteIds.has(n.id)).length > 0;
+
+  const renderCard = (note: RecordModel) => (
+    <NoteCard
+      key={note.id}
+      note={note}
+      onClick={() => openNote(note)}
+      onTogglePin={() => handleTogglePin(note)}
+      onToggleArchive={() => handleToggleArchive(note)}
+      onChangeColor={(color) => handleChangeColor(note, color)}
+      onDelete={() => requestDeleteNote(note.id)}
+    />
+  );
 
   return (
     <main className="min-h-screen bg-[var(--background)] pb-28 relative overflow-hidden transition-colors duration-300">
@@ -92,150 +246,129 @@ export default function Home() {
       <Header />
 
       <div className="max-w-4xl mx-auto px-4 md:px-6 relative z-10 animate-fade-in-up">
-        
-        {/* Render Notes Section */}
-        {visibleNotes.length > 0 ? (
-          <div className="space-y-8">
-            
-            {/* Pinned Notes Section */}
-            {pinnedNotesCount > 0 && (
-              <div className="space-y-3">
-                <h4 className="text-[10px] font-extrabold text-[var(--text-muted)] tracking-widest uppercase pl-1 flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
-                  Angepinnt ({pinnedNotesCount})
-                </h4>
-                <Masonry
-                  breakpointCols={breakpointColumnsObj}
-                  className="my-masonry-grid"
-                  columnClassName="my-masonry-grid_column"
-                >
-                  {visibleNotes
-                    .filter(n => n.is_pinned)
-                    .map((note) => (
-                      <NoteCard 
-                        key={note.id} 
-                        note={note} 
-                        onClick={() => openNote(note)} 
-                      />
-                    ))}
-                </Masonry>
-              </div>
-            )}
-
-            {/* Other Notes Section */}
-            {regularNotesCount > 0 && (
-              <div className="space-y-3">
-                {pinnedNotesCount > 0 && (
-                  <h4 className="text-[10px] font-extrabold text-[var(--text-muted)] tracking-widest uppercase pl-1 pt-2">
-                    Weitere Notizen ({regularNotesCount})
-                  </h4>
-                )}
-                <Masonry
-                  breakpointCols={breakpointColumnsObj}
-                  className="my-masonry-grid"
-                  columnClassName="my-masonry-grid_column"
-                >
-                  {visibleNotes
-                    .filter(n => !n.is_pinned)
-                    .map((note) => (
-                      <NoteCard 
-                        key={note.id} 
-                        note={note} 
-                        onClick={() => openNote(note)} 
-                      />
-                    ))}
-                </Masonry>
-              </div>
-            )}
+        {/* Filter bar (only once notes exist) */}
+        {!isLoading && hasAnyNotes && (
+          <div className="mb-6">
+            <FilterBar
+              activeFilter={activeFilter}
+              onFilterChange={setActiveFilter}
+              usedColors={usedColors}
+              activeColor={activeColor}
+              onColorChange={setActiveColor}
+            />
           </div>
-        ) : (
-          /* Empty State */
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.2 }}
-            className="flex flex-col items-center justify-center py-20 text-center px-4"
-          >
-            <div className="w-20 h-20 bg-primary/10 rounded-3xl flex items-center justify-center text-primary mb-6 border border-primary/15 shadow-inner">
-              <Layout className="w-10 h-10" />
-            </div>
-            <h3 className="text-xl font-bold text-[var(--text-primary)]">
-              Keine Notizen oder Checklisten
-            </h3>
-            <p className="text-sm text-[var(--text-secondary)] mt-2 max-w-sm leading-relaxed">
-              Erstelle deine erste Notiz oder einen gemeinsamen Einkaufszettel durch Klicken auf das Plus-Symbol unten rechts.
-            </p>
-          </motion.div>
         )}
+
+        <PullToRefresh onRefresh={refetch}>
+          {isLoading ? (
+            /* Skeleton loading state */
+            <Masonry
+              breakpointCols={breakpointColumnsObj}
+              className="my-masonry-grid"
+              columnClassName="my-masonry-grid_column"
+            >
+              {Array.from({ length: 6 }).map((_, i) => (
+                <NoteCardSkeleton key={i} lines={2 + (i % 3)} />
+              ))}
+            </Masonry>
+          ) : filteredNotes.length > 0 ? (
+            <div className="space-y-8">
+              {/* Pinned Notes Section */}
+              {pinnedNotes.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="text-[10px] font-extrabold text-[var(--text-muted)] tracking-widest uppercase pl-1 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
+                    Angepinnt ({pinnedNotes.length})
+                  </h4>
+                  <Masonry
+                    breakpointCols={breakpointColumnsObj}
+                    className="my-masonry-grid"
+                    columnClassName="my-masonry-grid_column"
+                  >
+                    {pinnedNotes.map(renderCard)}
+                  </Masonry>
+                </div>
+              )}
+
+              {/* Other Notes Section */}
+              {regularNotes.length > 0 && (
+                <div className="space-y-3">
+                  {pinnedNotes.length > 0 && (
+                    <h4 className="text-[10px] font-extrabold text-[var(--text-muted)] tracking-widest uppercase pl-1 pt-2">
+                      Weitere Notizen ({regularNotes.length})
+                    </h4>
+                  )}
+                  <Masonry
+                    breakpointCols={breakpointColumnsObj}
+                    className="my-masonry-grid"
+                    columnClassName="my-masonry-grid_column"
+                  >
+                    {regularNotes.map(renderCard)}
+                  </Masonry>
+                </div>
+              )}
+            </div>
+          ) : hasAnyNotes ? (
+            /* Filter returned nothing */
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="flex flex-col items-center justify-center py-20 text-center px-4"
+            >
+              <div className="w-20 h-20 bg-[var(--card-bg)] rounded-3xl flex items-center justify-center text-[var(--text-muted)] mb-6 border border-[var(--border-color)]">
+                <SearchX className="w-10 h-10" />
+              </div>
+              <h3 className="text-xl font-bold text-[var(--text-primary)]">
+                Keine Treffer
+              </h3>
+              <p className="text-sm text-[var(--text-secondary)] mt-2 max-w-sm leading-relaxed">
+                Für diesen Filter gibt es keine Notizen. Passe den Filter an oder erstelle etwas Neues.
+              </p>
+            </motion.div>
+          ) : (
+            /* Empty State */
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.2 }}
+              className="flex flex-col items-center justify-center py-20 text-center px-4"
+            >
+              <div className="w-20 h-20 bg-primary/10 rounded-3xl flex items-center justify-center text-primary mb-6 border border-primary/15 shadow-inner">
+                <Layout className="w-10 h-10" />
+              </div>
+              <h3 className="text-xl font-bold text-[var(--text-primary)]">
+                Keine Notizen oder Checklisten
+              </h3>
+              <p className="text-sm text-[var(--text-secondary)] mt-2 max-w-sm leading-relaxed">
+                Tippe auf das Plus-Symbol für eine Notiz – oder halte es gedrückt, um eine Checkliste zu erstellen.
+              </p>
+            </motion.div>
+          )}
+        </PullToRefresh>
       </div>
 
-      {/* FAB Floating Action Button */}
-      <FAB onClick={() => {
-        if (!isSheetOpen) {
-          setActiveNote(null);
-          setEditorType(null);
-          setIsSheetOpen(true);
-        }
-      }} />
+      {/* FAB: tap = note, long-press = type picker */}
+      <FAB onCreateText={openText} onCreateChecklist={openChecklist} />
 
       {/* Slide-Up Bottom Sheet */}
       <BottomSheet isOpen={isSheetOpen} onClose={closeSheet}>
-        {!editorType ? (
-          /* High-Fidelity Creation Picker */
-          <div className="py-6 px-4 md:px-6">
-            <div className="flex items-center gap-2 mb-6">
-              <div className="w-1.5 h-6 bg-primary rounded-full"></div>
-              <h2 className="text-xl font-black text-[var(--text-primary)]">
-                Erstellen
-              </h2>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <motion.button 
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="flex items-center gap-4 p-5 bg-[var(--background)] hover:bg-[var(--primary-light)] rounded-2xl transition-all text-left border border-[var(--border-color)] hover:border-primary/20 group cursor-pointer"
-                onClick={() => setEditorType('text')}
-              >
-                <div className="w-12 h-12 bg-blue-500/10 text-blue-500 rounded-xl flex items-center justify-center group-hover:bg-blue-500 group-hover:text-white transition-all shadow-sm">
-                  <FileText className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-[var(--text-primary)] text-base">
-                    Freitext-Notiz
-                  </h3>
-                  <p className="text-xs text-[var(--text-secondary)] mt-0.5 leading-snug">
-                    Gedanken festhalten, Texte, klickbare Links.
-                  </p>
-                </div>
-              </motion.button>
-
-              <motion.button 
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="flex items-center gap-4 p-5 bg-[var(--background)] hover:bg-[var(--primary-light)] rounded-2xl transition-all text-left border border-[var(--border-color)] hover:border-primary/20 group cursor-pointer"
-                onClick={() => setEditorType('checklist')}
-              >
-                <div className="w-12 h-12 bg-green-500/10 text-green-500 rounded-xl flex items-center justify-center group-hover:bg-green-500 group-hover:text-white transition-all shadow-sm">
-                  <ListTodo className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-[var(--text-primary)] text-base">
-                    Gemeinsame Checkliste
-                  </h3>
-                  <p className="text-xs text-[var(--text-secondary)] mt-0.5 leading-snug">
-                    Einkaufszettel, Aufgaben – synchron in Echtzeit.
-                  </p>
-                </div>
-              </motion.button>
-            </div>
-          </div>
-        ) : editorType === 'text' ? (
-          <NoteEditor note={activeNote} onClose={closeSheet} />
+        {editorType === "checklist" ? (
+          <ChecklistEditor
+            note={activeNote}
+            onClose={closeSheet}
+            onRequestDelete={requestDeleteFromEditor}
+          />
         ) : (
-          <ChecklistEditor note={activeNote} onClose={closeSheet} />
+          <NoteEditor
+            note={activeNote}
+            onClose={closeSheet}
+            onRequestDelete={requestDeleteFromEditor}
+          />
         )}
       </BottomSheet>
+
+      {/* Global toast host (undo-delete, etc.) */}
+      <Toast />
     </main>
   );
 }

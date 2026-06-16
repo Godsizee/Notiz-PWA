@@ -8,9 +8,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 interface NoteEditorProps {
   note?: RecordModel | null; // null if creating a new note
   onClose: () => void;
+  /** When provided, deleting routes through the app's soft-delete + undo toast. */
+  onRequestDelete?: (noteId: string) => void;
 }
 
-export default function NoteEditor({ note, onClose }: NoteEditorProps) {
+export default function NoteEditor({ note, onClose, onRequestDelete }: NoteEditorProps) {
   const [title, setTitle] = useState(note?.title || '');
   const [content, setContent] = useState(note?.content || '');
   const [color, setColor] = useState(note?.color || 'white');
@@ -68,13 +70,16 @@ export default function NoteEditor({ note, onClose }: NoteEditorProps) {
     return () => clearTimeout(timer);
   }, [title, content, color, isPinned, isArchived, activeNoteId]);
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
+    // Route through the app-level soft-delete + undo toast when available.
+    if (activeNoteId && onRequestDelete) {
+      onRequestDelete(activeNoteId);
+      return;
+    }
     if (activeNoteId) {
-      try {
-        await pb.collection('notes').delete(activeNoteId);
-      } catch (err) {
-        console.error("Failed to delete note:", err);
-      }
+      pb.collection('notes').delete(activeNoteId).catch(err =>
+        console.error("Failed to delete note:", err)
+      );
     }
     onClose();
   };
