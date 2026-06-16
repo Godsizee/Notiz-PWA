@@ -2,7 +2,7 @@
 
 import ThemeToggle from "./ThemeToggle";
 import { pb } from "@/lib/pb";
-import { LogOut, NotebookPen } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
@@ -37,10 +37,9 @@ export default function Header() {
           <motion.div
             whileHover={{ scale: 1.05, rotate: -3 }}
             whileTap={{ scale: 0.95 }}
-            className="w-10 h-10 shrink-0 rounded-xl flex items-center justify-center text-white shadow-[var(--shadow-card)]"
-            style={{ backgroundImage: "var(--fab-gradient)" }}
+            className="w-10 h-10 shrink-0 rounded-xl overflow-hidden shadow-[var(--shadow-card)]"
           >
-            <NotebookPen className="w-5 h-5" />
+            <img src="/logo.png" alt="B&B Notes Logo" className="w-full h-full object-cover" />
           </motion.div>
           <div className="min-w-0">
             <h1 className="text-lg font-extrabold tracking-tight brand-text truncate">

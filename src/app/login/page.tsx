@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { pb } from "@/lib/pb";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, Lock, NotebookPen, AlertCircle, ArrowRight, CheckCircle } from "lucide-react";
+import { Mail, Lock, AlertCircle, ArrowRight, CheckCircle } from "lucide-react";
 
 const ALLOWED_EMAILS = [
   "badesebastian@outlook.com",
@@ -125,10 +125,9 @@ export default function LoginPage() {
           <motion.div
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="w-14 h-14 rounded-2xl flex items-center justify-center text-white mb-4 shadow-[var(--shadow-elevated)]"
-            style={{ backgroundImage: "var(--fab-gradient)" }}
+            className="w-14 h-14 rounded-2xl overflow-hidden mb-4 shadow-[var(--shadow-elevated)]"
           >
-            <NotebookPen className="w-8 h-8" />
+            <img src="/logo.png" alt="B&B Notes Logo" className="w-full h-full object-cover" />
           </motion.div>
           <h1 className="text-3xl font-extrabold text-center tracking-tight text-[var(--text-primary)]">
             B&amp;B Notes
