@@ -62,7 +62,9 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({ success: true }, { status: 201 });
-  } catch (err) {
+  } catch (err: any) {
+    console.error("Registration error:", err?.response || err);
+    
     const pbErr = err as {
       status?: number;
       data?: { data?: Record<string, { message: string }> };
@@ -76,7 +78,7 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json(
-      { error: "Registrierung fehlgeschlagen. Bitte versuche es erneut." },
+      { error: `Registrierung fehlgeschlagen: ${err?.message || "Unbekannter Fehler"}` },
       { status: 500 }
     );
   }
