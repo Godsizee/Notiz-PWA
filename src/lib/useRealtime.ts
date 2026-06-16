@@ -9,9 +9,7 @@ export function useRealtimeNotes() {
   // Manual fetch — reused for the initial load and for pull-to-refresh.
   const refetch = useCallback(async () => {
     try {
-      const records = await pb.collection('notes').getFullList({
-        sort: '-created',
-      });
+      const records = await pb.collection('notes').getFullList();
       setNotes(records);
     } catch (err) {
       console.error("Failed to fetch notes:", err);
