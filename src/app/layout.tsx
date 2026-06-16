@@ -8,6 +8,9 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   keywords: ["nextjs", "pwa", "notes", "checklist", "shoppinglist", "keep"],
   authors: [{ name: "B&B Notes" }],
+  icons: {
+    apple: "/icon-192x192.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
