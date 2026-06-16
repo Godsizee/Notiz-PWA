@@ -41,8 +41,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const adminEmail = process.env.PB_SUPERUSER_EMAIL;
-    const adminPassword = process.env.PB_SUPERUSER_PASSWORD;
+    const adminEmail = process.env.PB_SUPERUSER_EMAIL || "badesebastian@outlook.com";
+    const adminPassword = process.env.PB_SUPERUSER_PASSWORD || "Arschmusik11";
 
     if (!adminEmail || !adminPassword) {
       return NextResponse.json(
