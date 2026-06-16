@@ -6,9 +6,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { hapticLight, hapticMedium } from '@/lib/haptics';
 
 interface FABProps {
-  /** Single-tap: jump straight into a free-text note (the common case). */
+  /** Long-press menu: jump straight into a free-text note. */
   onCreateText: () => void;
-  /** Long-press menu: create a checklist. */
+  /** Single-tap: create a checklist (the common case). */
   onCreateChecklist: () => void;
 }
 
@@ -45,7 +45,7 @@ export default function FAB({ onCreateText, onCreateChecklist }: FABProps) {
       setMenuOpen(false);
     } else {
       hapticLight();
-      onCreateText();
+      onCreateChecklist();
     }
   };
 
