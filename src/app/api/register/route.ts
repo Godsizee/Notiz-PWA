@@ -41,18 +41,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const adminEmail = process.env.PB_SUPERUSER_EMAIL || "badesebastian@outlook.com";
-    const adminPassword = process.env.PB_SUPERUSER_PASSWORD || "Arschmusik11";
-
-    if (!adminEmail || !adminPassword) {
-      return NextResponse.json(
-        { error: "Serverkonfiguration unvollständig." },
-        { status: 500 }
-      );
-    }
-
     const pb = new PocketBase(PB_URL);
-    await pb.collection("_superusers").authWithPassword(adminEmail, adminPassword);
 
     await pb.collection("users").create({
       email: normalizedEmail,
