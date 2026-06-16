@@ -66,7 +66,10 @@ export function useRealtimeChecklist(noteId: string) {
       if (e.record.note !== noteId) return;
 
       if (e.action === 'create') {
-        setItems((prev) => [...prev, e.record].sort((a, b) => a.order - b.order));
+        setItems((prev) => {
+          if (prev.some(i => i.id === e.record.id)) return prev;
+          return [...prev, e.record].sort((a, b) => a.order - b.order);
+        });
       } else if (e.action === 'update') {
         setItems((prev) =>
           prev.map((i) => (i.id === e.record.id ? e.record : i)).sort((a, b) => a.order - b.order)
