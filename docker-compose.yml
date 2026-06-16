@@ -9,6 +9,8 @@ services:
     environment:
       - NEXT_PUBLIC_POCKETBASE_URL=${NEXT_PUBLIC_POCKETBASE_URL:-https://pb.dasdann.jetzt}
       - POCKETBASE_URL=${POCKETBASE_URL:-http://pocketbase:8090}
+      - PB_SUPERUSER_EMAIL=${PB_SUPERUSER_EMAIL}
+      - PB_SUPERUSER_PASSWORD=${PB_SUPERUSER_PASSWORD}
     depends_on:
       - pocketbase
     restart: always
