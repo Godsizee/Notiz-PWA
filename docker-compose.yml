@@ -20,8 +20,8 @@ services:
     ports:
       - "8090:8090"
     environment:
-      - PB_SUPERUSER_EMAIL=admin@notiz.local
-      - PB_SUPERUSER_PASSWORD=AdminPassword123!
+      - PB_SUPERUSER_EMAIL=badesebastian@outlook.com
+      - PB_SUPERUSER_PASSWORD=Arschmusik11
     volumes:
       - pb_data:/pb_data
       - pb_public:/pb_public
