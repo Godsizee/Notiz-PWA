@@ -1,1 +1,1 @@
-@AGENTS.md
+> **IMPORTANT:** Read `.agents\agents.md` immediately at the start of every session before doing anything else. It explains the two-folder workspace (Code + Obsidian Vault) and the mandatory session protocol.
