@@ -8,7 +8,10 @@ const ALLOWED_EMAILS = [
   "annaklatsche83@gmail.com",
 ];
 
-const PB_URL = process.env.NEXT_PUBLIC_POCKETBASE_URL || "https://pbnote.dasdann.jetzt";
+const PB_URL =
+  process.env.POCKETBASE_URL ||
+  process.env.NEXT_PUBLIC_POCKETBASE_URL ||
+  "https://pbnote.dasdann.jetzt";
 
 export async function POST(request: Request) {
   try {
