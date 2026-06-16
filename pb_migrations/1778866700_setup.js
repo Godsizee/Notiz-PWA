@@ -31,11 +31,11 @@ migrate((app) => {
         new BoolField({ name: "is_archived" }),
         new RelationField({ name: "owner", required: true, options: { collectionId: usersCollection.id, maxSelect: 1 } }),
       ],
-      listRule: "@request.auth.id != ''",
-      viewRule: "@request.auth.id != ''",
+      listRule: "owner = @request.auth.id",
+      viewRule: "owner = @request.auth.id",
       createRule: "@request.auth.id != ''",
-      updateRule: "@request.auth.id != ''",
-      deleteRule: "@request.auth.id != ''",
+      updateRule: "owner = @request.auth.id",
+      deleteRule: "owner = @request.auth.id",
     });
     app.save(notes);
   } catch (e) { /* ignore if exists */ }
@@ -52,11 +52,11 @@ migrate((app) => {
         new BoolField({ name: "is_completed" }),
         new NumberField({ name: "order" }),
       ],
-      listRule: "@request.auth.id != ''",
-      viewRule: "@request.auth.id != ''",
-      createRule: "@request.auth.id != ''",
-      updateRule: "@request.auth.id != ''",
-      deleteRule: "@request.auth.id != ''",
+      listRule: "note.owner = @request.auth.id",
+      viewRule: "note.owner = @request.auth.id",
+      createRule: "note.owner = @request.auth.id",
+      updateRule: "note.owner = @request.auth.id",
+      deleteRule: "note.owner = @request.auth.id",
     });
     app.save(checklistItems);
   } catch (e) { /* ignore if exists */ }

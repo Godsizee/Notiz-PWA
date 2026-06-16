@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { RecordModel } from 'pocketbase';
 import { pb } from '@/lib/pb';
-import { Palette, Pin, Archive, Trash2, Plus, X, CheckCircle2, Circle, Check, RefreshCw, MoreVertical, Play, RotateCcw, CheckSquare } from 'lucide-react';
+import { Palette, Pin, Archive, Trash2, Plus, X, CheckCircle2, Circle, Check, RefreshCw, MoreVertical, RotateCcw } from 'lucide-react';
 import { useRealtimeChecklist } from '@/lib/useRealtime';
 import { getNoteColorStyles, NOTE_COLORS } from '@/lib/colors';
 import { motion, AnimatePresence } from 'framer-motion';

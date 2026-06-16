@@ -1,3 +1,5 @@
+import type { CSSProperties } from 'react';
+
 export const NOTE_COLORS = [
   { id: 'white', label: 'Standard', hex: '#ffffff' },
   { id: 'blue', label: 'Blau', hex: '#e3f2fd' },
@@ -12,7 +14,7 @@ export interface NoteStyle {
   bg: string;
   icon: string;
   id: string;
-  style?: React.CSSProperties;
+  style?: CSSProperties;
 }
 
 export function getNoteColorStyles(color: string | undefined): NoteStyle {

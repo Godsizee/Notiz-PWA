@@ -12,7 +12,7 @@ export function middleware(request: NextRequest) {
       const parsedCookie = JSON.parse(decodeURIComponent(pbAuthCookie));
       authStoreModel = parsedCookie.model;
       isValid = !!parsedCookie.token; // check token presence
-    } catch (e) {
+    } catch {
       // Cookie parsing error, treat as invalid session
     }
   }

@@ -11,9 +11,9 @@ import FAB from "@/components/ui/FAB";
 import BottomSheet from "@/components/ui/BottomSheet";
 import NoteEditor from "@/components/notes/NoteEditor";
 import ChecklistEditor from "@/components/notes/ChecklistEditor";
-import { FileText, ListTodo, Plus, Info, Layout } from "lucide-react";
+import { FileText, ListTodo, Layout } from "lucide-react";
 import Header from "@/components/ui/Header";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 
 export default function Home() {
   const { notes } = useRealtimeNotes();

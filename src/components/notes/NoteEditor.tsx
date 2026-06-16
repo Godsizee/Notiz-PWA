@@ -170,7 +170,6 @@ export default function NoteEditor({ note, onClose }: NoteEditorProps) {
                 className="absolute bottom-16 left-0 bg-card border border-[var(--border-color)] shadow-2xl rounded-2xl p-3 flex gap-2.5 z-[60]"
               >
                 {NOTE_COLORS.map(c => {
-                  const styleMap = getNoteColorStyles(c.hex);
                   return (
                     <button
                       key={c.id}
