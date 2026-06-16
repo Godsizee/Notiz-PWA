@@ -1,6 +1,6 @@
 import PocketBase from 'pocketbase';
 
-const pbUrl = process.env.NEXT_PUBLIC_POCKETBASE_URL || 'https://pb.dasdann.jetzt';
+const pbUrl = process.env.NEXT_PUBLIC_POCKETBASE_URL || 'https://pbnote.dasdann.jetzt';
 
 export const pb = new PocketBase(pbUrl);
 
