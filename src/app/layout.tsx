@@ -2,16 +2,16 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Notiz PWA",
-  description: "Schlanke, performante Notiz- und Einkaufszettel-App für 2 Personen",
+  title: "B&B Notes",
+  description: "Geteilte Notizen und Checklisten für zwei",
   generator: "Next.js",
   manifest: "/manifest.json",
   keywords: ["nextjs", "pwa", "notes", "checklist", "shoppinglist", "keep"],
-  authors: [{ name: "Notiz App" }],
+  authors: [{ name: "B&B Notes" }],
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Notiz",
+    title: "B&B Notes",
   },
 };
 

@@ -1,16 +1,22 @@
 {
-  "name": "Notiz PWA",
-  "short_name": "Notiz",
-  "description": "Shared notes and checklists",
+  "id": "/",
+  "name": "B&B Notes",
+  "short_name": "B&B Notes",
+  "description": "Geteilte Notizen und Checklisten für zwei",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#0b0717",
   "theme_color": "#390099",
+  "lang": "de",
+  "categories": ["productivity", "utilities"],
   "icons": [
     {
       "src": "/icon-192x192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "/icon-512x512.png",
