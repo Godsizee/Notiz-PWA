@@ -25,6 +25,24 @@ export default function NoteEditor({ note, onClose, onRequestDelete }: NoteEdito
   // Track active ID to differentiate between updates and first-time creation
   const [activeNoteId, setActiveNoteId] = useState<string | undefined>(note?.id);
 
+  // Refs for unmount-cleanup (always hold latest values without re-registering the effect)
+  const activeNoteIdRef = useRef<string | undefined>(note?.id);
+  const titleRef = useRef(note?.title || '');
+  const contentRef = useRef(note?.content || '');
+  useEffect(() => { activeNoteIdRef.current = activeNoteId; }, [activeNoteId]);
+  useEffect(() => { titleRef.current = title; }, [title]);
+  useEffect(() => { contentRef.current = content; }, [content]);
+
+  // Ghost-Note-Cleanup: delete silently if closed while completely empty
+  useEffect(() => {
+    return () => {
+      const id = activeNoteIdRef.current;
+      if (id && !titleRef.current.trim() && !contentRef.current.trim()) {
+        pb.collection('notes').delete(id).catch(() => {});
+      }
+    };
+  }, []);
+
   // Auto-expand textarea height as content changes
   useEffect(() => {
     if (textareaRef.current) {

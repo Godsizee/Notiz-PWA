@@ -96,7 +96,7 @@ function ActiveChecklistRow({
       {/* Delete cross */}
       <button
         onClick={() => onDelete(item.id)}
-        className="opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-red-500 transition-all cursor-pointer p-1 shrink-0"
+        className="opacity-100 md:opacity-0 md:group-hover:opacity-100 text-[var(--text-muted)] hover:text-red-500 transition-all cursor-pointer p-1 shrink-0"
         title="Eintrag entfernen"
       >
         <X className="w-4 h-4" />
@@ -122,6 +122,24 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
 
   const { items, setItems } = useRealtimeChecklist(activeNoteId || '');
   const { others } = usePresence(activeNoteId);
+
+  // Refs for unmount-cleanup (always hold latest values without re-registering the effect)
+  const activeNoteIdRef = useRef<string | undefined>(note?.id);
+  const titleRef = useRef(note?.title || '');
+  const itemsRef = useRef(items);
+  useEffect(() => { activeNoteIdRef.current = activeNoteId; }, [activeNoteId]);
+  useEffect(() => { titleRef.current = title; }, [title]);
+  useEffect(() => { itemsRef.current = items; }, [items]);
+
+  // Ghost-Note-Cleanup: delete silently if closed with no title and no items
+  useEffect(() => {
+    return () => {
+      const id = activeNoteIdRef.current;
+      if (id && !titleRef.current.trim() && itemsRef.current.length === 0) {
+        pb.collection('notes').delete(id).catch(() => {});
+      }
+    };
+  }, []);
   const newItemInputRef = useRef<HTMLInputElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const itemInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -519,7 +537,7 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
 
                       <button
                         onClick={() => handleDeleteItem(item.id)}
-                        className="opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-red-500 transition-all cursor-pointer p-1"
+                        className="opacity-100 md:opacity-0 md:group-hover:opacity-100 text-[var(--text-muted)] hover:text-red-500 transition-all cursor-pointer p-1"
                         title="Eintrag löschen"
                       >
                         <Trash2 className="w-4 h-4" />

@@ -6,6 +6,7 @@ import { Pin, Circle, CheckCircle2, ListTodo, FileText, Trash2 } from 'lucide-re
 import { useRealtimeChecklist } from '@/lib/useRealtime';
 import { motion, useMotionValue, useTransform, type PanInfo } from 'framer-motion';
 import { getNoteColorStyles } from '@/lib/colors';
+import { formatRelative } from '@/lib/relativeTime';
 import { hapticMedium, hapticHeavy } from '@/lib/haptics';
 import ContextMenu from '@/components/ui/ContextMenu';
 
@@ -198,6 +199,13 @@ export default function NoteCard({
               </p>
             )}
           </div>
+        )}
+
+        {/* Relative timestamp */}
+        {(note.updated || note.created) && (
+          <p className="mt-3 text-[9px] text-[var(--text-muted)] text-right">
+            {formatRelative(note.updated || note.created)}
+          </p>
         )}
       </motion.div>
 
