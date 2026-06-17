@@ -9,6 +9,7 @@ import { getNoteColorStyles } from '@/lib/colors';
 import { formatRelative } from '@/lib/relativeTime';
 import { hapticMedium, hapticHeavy } from '@/lib/haptics';
 import ContextMenu from '@/components/ui/ContextMenu';
+import { parseQuantity } from '@/lib/quantities';
 
 interface NoteCardProps {
   note: RecordModel;
@@ -177,8 +178,21 @@ export default function NoteCard({
                 ) : (
                   <Circle className="w-4 h-4 text-[var(--text-muted)]/40 shrink-0" />
                 )}
-                <span className={`text-sm ${item.is_completed ? 'line-through text-[var(--text-muted)]/60 font-normal' : 'text-[var(--text-secondary)] font-medium'} line-clamp-1`}>
-                  {item.text}
+                <span className={`text-sm ${item.is_completed ? 'line-through text-[var(--text-muted)]/60 font-normal' : 'text-[var(--text-secondary)] font-medium'} line-clamp-1 flex items-center gap-1.5 min-w-0 overflow-hidden`}>
+                  {(() => {
+                    const { quantity, text: restText } = parseQuantity(item.text);
+                    if (quantity) {
+                      return (
+                        <>
+                          <span className={`px-1 py-0.5 rounded text-[10px] font-bold bg-[var(--text-primary)]/8 text-[var(--text-secondary)] border border-[var(--border-color)] shrink-0 ${item.is_completed ? 'opacity-50' : ''}`}>
+                            {quantity}
+                          </span>
+                          <span className="truncate">{restText}</span>
+                        </>
+                      );
+                    }
+                    return <span className="truncate">{item.text}</span>;
+                  })()}
                 </span>
               </div>
             ))}

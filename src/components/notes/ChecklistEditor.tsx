@@ -9,6 +9,7 @@ import { usePresence } from '@/lib/usePresence';
 import { getNoteColorStyles, NOTE_COLORS } from '@/lib/colors';
 import { motion, AnimatePresence, Reorder, useDragControls } from 'framer-motion';
 import { hapticLight } from '@/lib/haptics';
+import { parseQuantity } from '@/lib/quantities';
 
 interface ChecklistEditorProps {
   note?: RecordModel | null;
@@ -43,12 +44,15 @@ function ActiveChecklistRow({
   onBackspaceEmpty,
 }: ActiveRowProps) {
   const controls = useDragControls();
+  const [isFocused, setIsFocused] = useState(false);
+  const { quantity, text: restText } = parseQuantity(item.text);
 
   return (
     <Reorder.Item
       value={item}
       dragListener={false}
       dragControls={controls}
+      layoutId={item.id}
       whileDrag={{ scale: 1.02, boxShadow: '0 10px 30px -12px rgba(0,0,0,0.35)' }}
       className="flex items-center gap-2 group py-1.5 bg-transparent rounded-xl"
     >
@@ -75,23 +79,37 @@ function ActiveChecklistRow({
       </button>
 
       {/* Text field */}
-      <input
-        ref={(el) => registerRef(item.id, el)}
-        type="text"
-        className={`flex-1 bg-transparent border-none outline-none text-base md:text-lg text-[var(--text-primary)] transition-all ${isCompletedVisual ? 'line-through text-[var(--text-muted)]/60' : ''}`}
-        value={item.text}
-        onChange={(e) => onUpdateText(item.id, e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            onEnter(item);
-          }
-          if (e.key === 'Backspace' && item.text === '') {
-            e.preventDefault();
-            onBackspaceEmpty(item);
-          }
-        }}
-      />
+      <div className="flex-1 relative flex items-center min-w-0">
+        {!isFocused && quantity && (
+          <div className="absolute inset-0 flex items-center gap-2 pointer-events-none text-base md:text-lg text-[var(--text-primary)] overflow-hidden">
+            <span className="px-1.5 py-0.5 rounded-md text-xs font-bold bg-[var(--text-primary)]/8 text-[var(--text-secondary)] border border-[var(--border-color)] shrink-0">
+              {quantity}
+            </span>
+            <span className={`truncate ${isCompletedVisual ? 'line-through text-[var(--text-muted)]/60' : ''}`}>
+              {restText}
+            </span>
+          </div>
+        )}
+        <input
+          ref={(el) => registerRef(item.id, el)}
+          type="text"
+          className={`w-full bg-transparent border-none outline-none text-base md:text-lg text-[var(--text-primary)] transition-all ${isCompletedVisual ? 'line-through text-[var(--text-muted)]/60' : ''} ${!isFocused && quantity ? 'text-transparent selection:text-transparent' : ''}`}
+          value={item.text}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+          onChange={(e) => onUpdateText(item.id, e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              onEnter(item);
+            }
+            if (e.key === 'Backspace' && item.text === '') {
+              e.preventDefault();
+              onBackspaceEmpty(item);
+            }
+          }}
+        />
+      </div>
 
       {/* Delete cross */}
       <button
@@ -522,6 +540,7 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
                   return (
                     <motion.div
                       key={item.id}
+                      layoutId={item.id}
                       layout
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -539,8 +558,21 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
                         )}
                       </button>
 
-                      <span className={`flex-1 text-base md:text-lg text-[var(--text-primary)] transition-all ${isCompletedVisual ? 'line-through text-[var(--text-muted)]/60' : ''}`}>
-                        {item.text}
+                      <span className={`flex-1 text-base md:text-lg text-[var(--text-primary)] transition-all ${isCompletedVisual ? 'line-through text-[var(--text-muted)]/60' : ''} flex items-center gap-2 min-w-0 overflow-hidden`}>
+                        {(() => {
+                          const { quantity, text: restText } = parseQuantity(item.text);
+                          if (quantity) {
+                            return (
+                              <>
+                                <span className="px-1.5 py-0.5 rounded-md text-xs font-bold bg-[var(--text-primary)]/8 text-[var(--text-secondary)] border border-[var(--border-color)] shrink-0 opacity-60">
+                                  {quantity}
+                                </span>
+                                <span className="truncate">{restText}</span>
+                              </>
+                            );
+                          }
+                          return <span className="truncate">{item.text}</span>;
+                        })()}
                       </span>
 
                       <button
