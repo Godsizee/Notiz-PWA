@@ -229,7 +229,10 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
         is_completed: false,
         order: nextOrder(),
       });
-      setItems(prev => [...prev, record].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)));
+      setItems(prev => {
+        if (prev.some(i => i.id === record.id)) return prev;
+        return [...prev, record].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      });
       setNewItemText('');
       setTimeout(() => newItemInputRef.current?.focus(), 50);
     } catch (err) {
@@ -253,7 +256,10 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
         is_completed: false,
         order: newOrder,
       });
-      setItems(prev => [...prev, record].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)));
+      setItems(prev => {
+        if (prev.some(i => i.id === record.id)) return prev;
+        return [...prev, record].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      });
       setPendingFocusId(record.id);
     } catch (err) {
       console.error("Failed to insert checklist item:", err);
