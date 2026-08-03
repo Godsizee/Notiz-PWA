@@ -84,27 +84,27 @@
   --note-white-border: rgba(57, 0, 153, 0.08);
   --note-white-icon: #6b6385;
 
-  --note-blue: #eff6ff;
+  --note-blue: #dbeafe;
   --note-blue-border: #bfdbfe;
   --note-blue-icon: #2563eb;
 
-  --note-green: #f0fdf4;
+  --note-green: #dcfce7;
   --note-green-border: #bbf7d0;
   --note-green-icon: #16a34a;
 
-  --note-yellow: #fefce8;
+  --note-yellow: #fef9c3;
   --note-yellow-border: #fde68a;
   --note-yellow-icon: #ca8a04;
 
-  --note-pink: #fdf2f8;
+  --note-pink: #fce7f3;
   --note-pink-border: #fbcfe8;
   --note-pink-icon: #db2777;
 
-  --note-purple: #faf5ff;
+  --note-purple: #f3e8ff;
   --note-purple-border: #e9d5ff;
   --note-purple-icon: #7c3aed;
 
-  --note-orange: #fff7ed;
+  --note-orange: #ffedd5;
   --note-orange-border: #fed7aa;
   --note-orange-icon: #ea580c;
 }
@@ -147,27 +147,27 @@
   --note-white-border: rgba(199, 165, 255, 0.12);
   --note-white-icon: #897fa6;
 
-  --note-blue: rgba(30, 48, 80, 0.45);
+  --note-blue: rgba(30, 48, 80, 0.60);
   --note-blue-border: rgba(59, 130, 246, 0.35);
   --note-blue-icon: #60a5fa;
 
-  --note-green: rgba(24, 50, 36, 0.45);
+  --note-green: rgba(24, 50, 36, 0.60);
   --note-green-border: rgba(34, 197, 94, 0.35);
   --note-green-icon: #4ade80;
 
-  --note-yellow: rgba(50, 42, 20, 0.45);
+  --note-yellow: rgba(50, 42, 20, 0.60);
   --note-yellow-border: rgba(234, 179, 8, 0.35);
   --note-yellow-icon: #facc15;
 
-  --note-pink: rgba(50, 24, 28, 0.45);
+  --note-pink: rgba(50, 24, 28, 0.60);
   --note-pink-border: rgba(239, 68, 68, 0.35);
   --note-pink-icon: #fca5a5;
 
-  --note-purple: rgba(57, 0, 153, 0.32);
+  --note-purple: rgba(57, 0, 153, 0.45);
   --note-purple-border: rgba(157, 78, 221, 0.45);
   --note-purple-icon: #c77dff;
 
-  --note-orange: rgba(50, 32, 20, 0.45);
+  --note-orange: rgba(50, 32, 20, 0.60);
   --note-orange-border: rgba(249, 115, 22, 0.35);
   --note-orange-icon: #ffb07c;
 }
@@ -213,22 +213,22 @@
     --note-white: #17112b;
     --note-white-border: rgba(199, 165, 255, 0.12);
     --note-white-icon: #897fa6;
-    --note-blue: rgba(30, 48, 80, 0.45);
+    --note-blue: rgba(30, 48, 80, 0.60);
     --note-blue-border: rgba(59, 130, 246, 0.35);
     --note-blue-icon: #60a5fa;
-    --note-green: rgba(24, 50, 36, 0.45);
+    --note-green: rgba(24, 50, 36, 0.60);
     --note-green-border: rgba(34, 197, 94, 0.35);
     --note-green-icon: #4ade80;
-    --note-yellow: rgba(50, 42, 20, 0.45);
+    --note-yellow: rgba(50, 42, 20, 0.60);
     --note-yellow-border: rgba(234, 179, 8, 0.35);
     --note-yellow-icon: #facc15;
-    --note-pink: rgba(50, 24, 28, 0.45);
+    --note-pink: rgba(50, 24, 28, 0.60);
     --note-pink-border: rgba(239, 68, 68, 0.35);
     --note-pink-icon: #fca5a5;
-    --note-purple: rgba(57, 0, 153, 0.32);
+    --note-purple: rgba(57, 0, 153, 0.45);
     --note-purple-border: rgba(157, 78, 221, 0.45);
     --note-purple-icon: #c77dff;
-    --note-orange: rgba(50, 32, 20, 0.45);
+    --note-orange: rgba(50, 32, 20, 0.60);
     --note-orange-border: rgba(249, 115, 22, 0.35);
     --note-orange-icon: #ffb07c;
   }
