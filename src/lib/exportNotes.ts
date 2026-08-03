@@ -1,11 +1,24 @@
+import { RecordModel } from 'pocketbase';
 import { pb } from '@/lib/pb';
-import { cacheGetAll, CachedRecord } from '@/lib/offlineDb';
+import { cacheGetAll, CachedRecord, SyncCollection } from '@/lib/offlineDb';
+import { imageOriginalUrl } from '@/lib/noteImages';
 
 // Client-seitiges Backup (Scope v1.2 Stufe 2): alle sichtbaren Notizen samt
 // Checklist-Items als JSON oder Markdown herunterladen. Offline wird auf den
 // IndexedDB-Snapshot zurückgegriffen.
+//
+// Bilder werden als URL referenziert, nicht als Base64 eingebettet: ein Backup
+// soll eine kleine Textdatei bleiben, die man sich ansehen kann. Ein Export,
+// der die Binärdaten enthielte, wäre schnell dreistellig in MB.
 
 export type ExportFormat = 'json' | 'markdown';
+
+interface ExportImage {
+  filename: string;
+  url: string;
+  width: number;
+  height: number;
+}
 
 interface ExportNote {
   id: string;
@@ -19,9 +32,10 @@ interface ExportNote {
   created: string;
   updated: string;
   items: { text: string; is_completed: boolean }[];
+  images: ExportImage[];
 }
 
-async function fetchAll(collection: 'notes' | 'checklist_items'): Promise<CachedRecord[]> {
+async function fetchAll(collection: SyncCollection): Promise<CachedRecord[]> {
   try {
     return await pb.collection(collection).getFullList({ requestKey: null });
   } catch {
@@ -29,15 +43,27 @@ async function fetchAll(collection: 'notes' | 'checklist_items'): Promise<Cached
   }
 }
 
-async function collectNotes(): Promise<ExportNote[]> {
-  const [notes, items] = await Promise.all([fetchAll('notes'), fetchAll('checklist_items')]);
-
-  const itemsByNote = new Map<string, CachedRecord[]>();
-  for (const item of items) {
-    const noteId = String(item.note || '');
-    if (!itemsByNote.has(noteId)) itemsByNote.set(noteId, []);
-    itemsByNote.get(noteId)!.push(item);
+function groupByNote(records: CachedRecord[]): Map<string, CachedRecord[]> {
+  const map = new Map<string, CachedRecord[]>();
+  for (const record of records) {
+    const noteId = String(record.note || '');
+    if (!map.has(noteId)) map.set(noteId, []);
+    map.get(noteId)!.push(record);
   }
+  return map;
+}
+
+const byOrder = (a: CachedRecord, b: CachedRecord) => Number(a.order ?? 0) - Number(b.order ?? 0);
+
+async function collectNotes(): Promise<ExportNote[]> {
+  const [notes, items, images] = await Promise.all([
+    fetchAll('notes'),
+    fetchAll('checklist_items'),
+    fetchAll('note_images'),
+  ]);
+
+  const itemsByNote = groupByNote(items);
+  const imagesByNote = groupByNote(images);
 
   return notes
     .sort((a, b) => String(b.created || '').localeCompare(String(a.created || '')))
@@ -53,8 +79,17 @@ async function collectNotes(): Promise<ExportNote[]> {
       created: String(n.created || ''),
       updated: String(n.updated || ''),
       items: (itemsByNote.get(n.id) || [])
-        .sort((a, b) => Number(a.order ?? 0) - Number(b.order ?? 0))
+        .sort(byOrder)
         .map((i) => ({ text: String(i.text || ''), is_completed: !!i.is_completed })),
+      images: (imagesByNote.get(n.id) || [])
+        .sort(byOrder)
+        .map((img) => ({
+          filename: String(img.file || ''),
+          url: imageOriginalUrl(img as unknown as RecordModel) || '',
+          width: Number(img.width ?? 0),
+          height: Number(img.height ?? 0),
+        }))
+        .filter((img) => img.filename),
     }));
 }
 
@@ -69,6 +104,10 @@ function toMarkdown(notes: ExportNote[]): string {
     ].filter(Boolean);
     if (flags.length) lines.push(`*${flags.join(' · ')}*`);
     lines.push('');
+    for (const image of n.images) {
+      if (image.url) lines.push(`![${image.filename}](${image.url})`);
+    }
+    if (n.images.length > 0) lines.push('');
     if (n.type === 'checklist') {
       for (const item of n.items) lines.push(`- [${item.is_completed ? 'x' : ' '}] ${item.text}`);
       if (n.items.length === 0) lines.push('*Leere Checkliste*');

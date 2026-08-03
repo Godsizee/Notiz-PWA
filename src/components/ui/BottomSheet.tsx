@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useLayoutEffect } from 'react';
+import { useEffect, useRef, useState, useLayoutEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { hapticLight } from '@/lib/haptics';
 
@@ -32,6 +32,25 @@ export default function BottomSheet({ isOpen, onClose, layoutId, children }: Bot
       const max = window.innerHeight - HEADER_HEIGHT - 8;
       setHeight(Math.max(MIN_HEIGHT, Math.min(max, Math.round(window.innerHeight * DEFAULT_FRACTION))));
     }
+  }, [isOpen]);
+
+  // The height above is a pixel value captured once, at open time. Two things
+  // invalidate it while the sheet is open: unfolding a foldable (the viewport
+  // grows by a factor of ~2.5) and the on-screen keyboard appearing. Both
+  // would otherwise leave the sheet either stranded at a fraction of the
+  // screen or extending past the bottom of it.
+  useEffect(() => {
+    if (!isOpen) return;
+    const clamp = () => {
+      const max = window.innerHeight - HEADER_HEIGHT - 8;
+      setHeight((current) => Math.max(MIN_HEIGHT, Math.min(max, current || max)));
+    };
+    window.addEventListener('resize', clamp);
+    window.visualViewport?.addEventListener('resize', clamp);
+    return () => {
+      window.removeEventListener('resize', clamp);
+      window.visualViewport?.removeEventListener('resize', clamp);
+    };
   }, [isOpen]);
 
   const maxH = () => window.innerHeight - HEADER_HEIGHT - 8;

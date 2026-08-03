@@ -11,9 +11,13 @@ import { hapticMedium, hapticHeavy } from '@/lib/haptics';
 import ContextMenu from '@/components/ui/ContextMenu';
 import { parseQuantity } from '@/lib/quantities';
 import NoteContent from '@/components/notes/NoteContent';
+import NoteImageCollage from '@/components/notes/NoteImageCollage';
+import { NoteImageTile } from '@/components/notes/NoteImageGallery';
 
 interface NoteCardProps {
   note: RecordModel;
+  /** Images of this note, already sorted (see useRealtimeImages). */
+  images?: RecordModel[];
   onClick: () => void;
   onTogglePin: () => void;
   onToggleArchive: () => void;
@@ -31,6 +35,7 @@ const MOVE_TOLERANCE = 10; // px of movement that cancels a long-press
 
 export default function NoteCard({
   note,
+  images = [],
   onClick,
   onTogglePin,
   onToggleArchive,
@@ -150,10 +155,18 @@ export default function NoteCard({
 
         {isList ? (
           <>
-            {/* Type icon */}
-            <div className={`shrink-0 w-9 h-9 rounded-xl flex items-center justify-center bg-[var(--card-bg)]/60 border border-[var(--border-color)] ${colorStyles.icon}`}>
-              {note.type === 'checklist' ? <ListTodo className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
-            </div>
+            {/* Leading slot: the note's cover image if it has one, else the
+                type icon. A row this compact only has space for one of them. */}
+            {images.length > 0 ? (
+              <NoteImageTile
+                image={images[0]}
+                className="shrink-0 w-9 h-9 rounded-xl border border-[var(--border-color)]"
+              />
+            ) : (
+              <div className={`shrink-0 w-9 h-9 rounded-xl flex items-center justify-center bg-[var(--card-bg)]/60 border border-[var(--border-color)] ${colorStyles.icon}`}>
+                {note.type === 'checklist' ? <ListTodo className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
+              </div>
+            )}
 
             {/* Title + one-line preview */}
             <div className="min-w-0 flex-1">
@@ -184,6 +197,9 @@ export default function NoteCard({
           </>
         ) : (
         <>
+        {/* Image collage — bleeds to the card edges above the title (Keep style) */}
+        <NoteImageCollage images={images} />
+
         {/* Pin Icon */}
         {note.is_pinned && (
           <div className="absolute top-3.5 right-3.5 p-1.5 bg-[var(--card-bg)]/70 backdrop-blur-md rounded-lg text-primary shadow-sm border border-[var(--border-color)] z-10 transition-transform group-hover:scale-110">

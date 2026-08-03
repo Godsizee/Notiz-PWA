@@ -14,9 +14,13 @@ import {
   queueRemove,
   queueCount,
   queueEntries,
+  blobGet,
+  blobDelete,
+  blobKeys,
   deadLetterAdd,
   deadLetterCount,
   deadLetterClear,
+  deadLetterEntries,
 } from '@/lib/offlineDb';
 
 // Offline sync engine (Last-Write-Wins).
@@ -75,6 +79,12 @@ export function isAbortError(err: unknown): boolean {
 // plan's acceptance test measures against ("binnen ~2s").
 const CONNECTIVITY_TIMEOUT_MS = 2500;
 
+// Image uploads must not share that budget. A few hundred KB over mobile data
+// routinely takes longer than 2.5s, and treating that as "the network is
+// gone" would flip the whole app into offline mode — and re-queue an upload
+// that was in fact about to succeed — every single time a photo is attached.
+const UPLOAD_TIMEOUT_MS = 60_000;
+
 class WriteTimeoutError extends Error {}
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
@@ -120,7 +130,10 @@ export async function applyChange(op: SyncOp): Promise<RecordModel> {
   const online = typeof navigator === 'undefined' || navigator.onLine;
   if (online) {
     try {
-      return await withTimeout(applyRemote(op), CONNECTIVITY_TIMEOUT_MS);
+      return await withTimeout(
+        applyRemote(op),
+        op.blob ? UPLOAD_TIMEOUT_MS : CONNECTIVITY_TIMEOUT_MS
+      );
     } catch (err) {
       if (!(err instanceof WriteTimeoutError) && !isOfflineError(err)) throw err;
       // Either the request died mid-flight although the browser reported
@@ -131,15 +144,40 @@ export async function applyChange(op: SyncOp): Promise<RecordModel> {
   return applyLocal(op);
 }
 
+// Image ops carry their bytes in the `blobs` store instead of in op.data, so
+// they can't go out as JSON. Build the multipart body the PocketBase SDK
+// forwards as-is. Returns undefined when the blob is gone (already uploaded by
+// an earlier attempt, or evicted) — the caller then falls back to a plain
+// metadata-only write rather than re-uploading nothing.
+async function buildFormData(op: SyncOp, includeId: boolean): Promise<FormData | undefined> {
+  if (!op.blob) return undefined;
+  const blob = await blobGet(op.blob.key).catch(() => undefined);
+  if (!blob) return undefined;
+
+  const form = new FormData();
+  if (includeId) form.append('id', op.id);
+  for (const [key, value] of Object.entries(op.data ?? {})) {
+    if (value === undefined || value === null) continue;
+    form.append(key, typeof value === 'boolean' ? String(value) : String(value));
+  }
+  form.append(op.blob.field, blob, op.blob.filename);
+  return form;
+}
+
 async function applyRemote(op: SyncOp): Promise<RecordModel> {
   const col = pb.collection(op.collection);
+
   if (op.action === 'create') {
-    const record = await col.create({ id: op.id, ...op.data }, { requestKey: null });
+    const form = await buildFormData(op, true);
+    const record = await col.create(form ?? { id: op.id, ...op.data }, { requestKey: null });
+    if (op.blob) await blobDelete(op.blob.key).catch(() => {});
     await cachePut(op.collection, record).catch(() => {});
     return record;
   }
   if (op.action === 'update') {
-    const record = await col.update(op.id, op.data, { requestKey: null });
+    const form = await buildFormData(op, false);
+    const record = await col.update(op.id, form ?? op.data, { requestKey: null });
+    if (op.blob) await blobDelete(op.blob.key).catch(() => {});
     await cachePut(op.collection, record).catch(() => {});
     return record;
   }
@@ -161,6 +199,10 @@ async function applyLocal(op: SyncOp): Promise<RecordModel> {
         ? await cacheGet(op.collection, op.id).catch(() => undefined)
         : undefined;
     record = { created: now, ...existing, ...op.data, id: op.id, updated: now };
+    // The server hasn't seen the file yet, so `file` is empty — remember where
+    // the bytes are so the gallery can render the picked photo immediately
+    // instead of showing a gap until the queue flushes.
+    if (op.blob) record._blobKey = op.blob.key;
     await cachePut(op.collection, record).catch(() => {});
   }
 
@@ -200,20 +242,31 @@ async function registerBackgroundSync(): Promise<void> {
 async function replayQueued(op: SyncOp): Promise<void> {
   const col = pb.collection(op.collection);
   try {
-    if (op.action === 'create') await col.create({ id: op.id, ...op.data }, { requestKey: null });
-    else if (op.action === 'update') await col.update(op.id, op.data, { requestKey: null });
-    else await col.delete(op.id, { requestKey: null });
+    if (op.action === 'create') {
+      const form = await buildFormData(op, true);
+      await col.create(form ?? { id: op.id, ...op.data }, { requestKey: null });
+    } else if (op.action === 'update') {
+      const form = await buildFormData(op, false);
+      await col.update(op.id, form ?? op.data, { requestKey: null });
+    } else {
+      await col.delete(op.id, { requestKey: null });
+    }
   } catch (err) {
     const status = (err as { status?: number }).status;
     if (status === 404) return;
     if (op.action === 'create' && status === 400) {
-      await col.update(op.id, op.data, { requestKey: null }).catch((retryErr) => {
+      const retryForm = await buildFormData(op, false);
+      await col.update(op.id, retryForm ?? op.data, { requestKey: null }).catch((retryErr) => {
         if ((retryErr as { status?: number }).status !== 404) throw retryErr;
       });
       return;
     }
     throw err;
   }
+
+  // Uploaded (or the record was already gone) — the local copy has served its
+  // purpose as the optimistic preview and can be released.
+  if (op.blob) await blobDelete(op.blob.key).catch(() => {});
 }
 
 let flushing = false;
@@ -237,6 +290,9 @@ export async function flushQueue(): Promise<void> {
         if (status === 401) return; // stale token — retry once the app refreshes auth, not the op's fault
         // Genuinely unsyncable (validation/permission): move to dead-letter
         // instead of silently dropping it so the failure stays recoverable.
+        // Note the blob is deliberately *not* released here — the dead-lettered
+        // op still references it, and dropping the bytes would lose the photo
+        // for good.
         console.error('Moving unsyncable offline change to dead-letter:', op, err);
         await deadLetterAdd(op).catch(() => {});
         deadLettered++;
@@ -265,6 +321,30 @@ export async function flushQueue(): Promise<void> {
 export async function clearDeadLetters(): Promise<void> {
   await deadLetterClear().catch(() => {});
   useSyncStore.getState().setDeadLetterCount(0);
+  // The acknowledged ops were the last thing keeping their image bytes alive.
+  sweepOrphanBlobs().catch(() => {});
+}
+
+/**
+ * Drop image bytes no queued and no dead-lettered op refers to any more.
+ * Without this, an interrupted flush (or a blob whose op was removed while its
+ * delete never ran) would keep multi-hundred-KB photos in IndexedDB forever.
+ */
+async function sweepOrphanBlobs(): Promise<void> {
+  const keys = await blobKeys().catch(() => []);
+  if (keys.length === 0) return;
+
+  const [queued, dead] = await Promise.all([
+    queueEntries().catch(() => []),
+    deadLetterEntries().catch(() => []),
+  ]);
+  const referenced = new Set<string>();
+  queued.forEach(({ op }) => op.blob && referenced.add(op.blob.key));
+  dead.forEach(({ op }) => op.blob && referenced.add(op.blob.key));
+
+  await Promise.all(
+    keys.filter((key) => !referenced.has(key)).map((key) => blobDelete(key).catch(() => {}))
+  );
 }
 
 const REACHABILITY_INTERVAL_MS = 20_000;
@@ -277,6 +357,11 @@ export function initSync(): void {
   initialized = true;
 
   useSyncStore.getState().setOnline(navigator.onLine);
+
+  // Queued photos are the one thing here that's expensive to lose *and* big
+  // enough for the browser to consider evicting under storage pressure. Ask
+  // for persistent storage so an offline shot survives until it syncs.
+  navigator.storage?.persist?.().catch(() => {});
 
   window.addEventListener('online', async () => {
     // The browser fires this on link-layer changes (e.g. Wi-Fi reconnect)
@@ -332,4 +417,6 @@ export function initSync(): void {
   deadLetterCount()
     .then((count) => useSyncStore.getState().setDeadLetterCount(count))
     .catch(() => {});
+
+  sweepOrphanBlobs().catch(() => {});
 }

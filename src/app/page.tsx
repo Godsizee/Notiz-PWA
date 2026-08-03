@@ -5,7 +5,7 @@ import Masonry from "react-masonry-css";
 import { useRouter } from "next/navigation";
 import { RecordModel } from "pocketbase";
 import { pb } from "@/lib/pb";
-import { useRealtimeNotes } from "@/lib/useRealtime";
+import { useRealtimeNotes, useRealtimeImages } from "@/lib/useRealtime";
 import { useChecklistSearchIndex } from "@/lib/useSearch";
 import { applyChange } from "@/lib/sync";
 import { useKeyboardShortcuts } from "@/lib/useKeyboardShortcuts";
@@ -39,6 +39,8 @@ const breakpointColumnsObj = {
 
 export default function Home() {
   const { notes, isLoading, refetch } = useRealtimeNotes();
+  // Loaded once for the whole overview rather than per card — see the hook.
+  const imagesByNote = useRealtimeImages();
   const router = useRouter();
   const showToast = useToastStore((s) => s.showToast);
   const viewMode = usePreferencesStore((s) => s.viewMode);
@@ -170,9 +172,15 @@ export default function Home() {
 
   const handleDuplicate = async (note: RecordModel) => {
     try {
-      await duplicateNote(note);
+      const { skippedImages } = await duplicateNote(note);
       hapticLight();
-      showToast({ message: "Notiz dupliziert", duration: 3000 });
+      showToast({
+        message:
+          skippedImages > 0
+            ? `Notiz dupliziert – ${skippedImages} Bild${skippedImages === 1 ? "" : "er"} fehlt${skippedImages === 1 ? "" : "en"} (offline)`
+            : "Notiz dupliziert",
+        duration: skippedImages > 0 ? 4000 : 3000,
+      });
     } catch (err) {
       console.error("Failed to duplicate note:", err);
       notifyError("Duplizieren fehlgeschlagen.");
@@ -312,6 +320,7 @@ export default function Home() {
     <NoteCard
       key={note.id}
       note={note}
+      images={imagesByNote[note.id]}
       layout={viewMode}
       onClick={() => openNote(note)}
       onTogglePin={() => handleTogglePin(note)}
@@ -449,8 +458,12 @@ export default function Home() {
             onRequestDelete={requestDeleteFromEditor}
           />
         ) : (
+          /* The whole map, not one note's slice: a brand-new note only gets
+             its id once the editor persists it, and it needs to pick up its
+             images from that moment on. */
           <NoteEditor
             note={activeNote}
+            imagesByNote={imagesByNote}
             onClose={closeSheet}
             onRequestDelete={requestDeleteFromEditor}
           />

@@ -17,7 +17,15 @@ import withPWAInit from "@ducanh2912/next-pwa";
 const PB_ORIGIN = new URL(
   process.env.NEXT_PUBLIC_POCKETBASE_URL || "https://pbnote.dasdann.jetzt"
 ).origin;
-const PB_ORIGIN_PATTERN = new RegExp(`^${PB_ORIGIN.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/`);
+const PB_ORIGIN_ESCAPED = PB_ORIGIN.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const PB_ORIGIN_PATTERN = new RegExp(`^${PB_ORIGIN_ESCAPED}/`);
+
+// Note images are the one exception to the NetworkOnly rule above: they are
+// immutable (PocketBase gives every upload a random filename suffix, so a
+// changed image is a different URL) and useless to re-fetch. Without caching
+// them, a note that reads fine offline would show empty boxes where its
+// photos are. Listed first — Workbox matches runtimeCaching in array order.
+const PB_FILES_PATTERN = new RegExp(`^${PB_ORIGIN_ESCAPED}/api/files/`);
 
 const withPWA = withPWAInit({
   dest: "public",
@@ -33,6 +41,17 @@ const withPWA = withPWAInit({
   extendDefaultRuntimeCaching: true,
   workboxOptions: {
     runtimeCaching: [
+      {
+        urlPattern: PB_FILES_PATTERN,
+        handler: "CacheFirst",
+        options: {
+          cacheName: "pb-note-images",
+          expiration: { maxEntries: 300, maxAgeSeconds: 60 * 60 * 24 * 30 },
+          // status 0 covers the opaque response an unauthenticated cross-origin
+          // image request can produce.
+          cacheableResponse: { statuses: [0, 200] },
+        },
+      },
       {
         urlPattern: PB_ORIGIN_PATTERN,
         handler: "NetworkOnly",

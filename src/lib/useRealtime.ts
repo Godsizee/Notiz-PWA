@@ -1,9 +1,15 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { pb } from '@/lib/pb';
 import { RecordModel } from 'pocketbase';
 import { onLocalChange, isAbortError } from '@/lib/sync';
 import { useSyncStore } from '@/store/useSyncStore';
-import { cacheGetAll, cacheItemsByNote, cacheReplaceNotes, cacheReplaceItems } from '@/lib/offlineDb';
+import {
+  cacheGetAll,
+  cacheItemsByNote,
+  cacheReplaceNotes,
+  cacheReplaceItems,
+  cacheReplaceImages,
+} from '@/lib/offlineDb';
 
 // Network failure (offline / server unreachable) — not an auto-cancel abort.
 function isOfflineError(err: unknown): boolean {
@@ -91,6 +97,80 @@ export function useRealtimeNotes() {
   }, []);
 
   return { notes, setNotes, isLoading, refetch };
+}
+
+export type ImagesByNote = Record<string, RecordModel[]>;
+
+/**
+ * All note images, loaded once for the whole app rather than per card.
+ *
+ * useRealtimeChecklist() deliberately fetches per note because a checklist is
+ * only ever expanded one at a time — images are different: every card in the
+ * overview may show a thumbnail, so a per-card fetch would mean one request
+ * per note on every load. One list + a noteId→images map is both cheaper and
+ * simpler for the editor to consume.
+ */
+export function useRealtimeImages() {
+  const [images, setImages] = useState<RecordModel[]>([]);
+  const flushSerial = useSyncStore((s) => s.flushSerial);
+
+  const byOrder = (a: RecordModel, b: RecordModel) => (a.order ?? 0) - (b.order ?? 0);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchImages = async () => {
+      try {
+        const records = await pb
+          .collection('note_images')
+          .getFullList({ sort: 'order', requestKey: 'note_images_list' });
+        if (!cancelled) setImages(records);
+        cacheReplaceImages(records).catch(() => {});
+      } catch (err) {
+        if (isOfflineError(err)) {
+          const cached = await cacheGetAll('note_images').catch(() => []);
+          if (!cancelled) setImages((cached as unknown as RecordModel[]).sort(byOrder));
+        } else if (!isAbortError(err)) {
+          console.error('Failed to fetch note images:', err);
+        }
+      }
+    };
+
+    fetchImages();
+
+    let unsubscribe: (() => void) | undefined;
+    pb.collection('note_images')
+      .subscribe('*', function (e) {
+        setImages((prev) => applyEvent(prev, e.action, e.record, byOrder));
+      })
+      .then((fn) => { unsubscribe = fn; })
+      .catch((err) => console.error('Failed to subscribe to note images:', err));
+
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
+  }, [flushSerial]);
+
+  // Offline writes bypass the server → mirror them into the UI immediately.
+  useEffect(() => {
+    return onLocalChange((change) => {
+      if (change.collection !== 'note_images') return;
+      setImages((prev) => applyEvent(prev, change.action, change.record, byOrder));
+    });
+  }, []);
+
+  const byNote = useMemo(() => {
+    const map: ImagesByNote = {};
+    for (const image of images) {
+      const noteId = String(image.note ?? '');
+      if (!noteId) continue;
+      (map[noteId] ||= []).push(image);
+    }
+    return map;
+  }, [images]);
+
+  return byNote;
 }
 
 export function useRealtimeChecklist(noteId: string) {
