@@ -7,7 +7,7 @@ import { LogOut, Search, X, Cloud, CloudOff, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
-import { initSync } from "@/lib/sync";
+import { initSync, clearDeadLetters } from "@/lib/sync";
 import { initPreferences } from "@/store/usePreferencesStore";
 import { useSyncStore } from "@/store/useSyncStore";
 
@@ -26,6 +26,8 @@ export default function Header({ searchQuery = "", onSearchChange }: HeaderProps
   const isOnline = useSyncStore((s) => s.isOnline);
   const isSyncing = useSyncStore((s) => s.isSyncing);
   const pendingCount = useSyncStore((s) => s.pendingCount);
+  const deadLetterCount = useSyncStore((s) => s.deadLetterCount);
+  const hasDeadLetters = deadLetterCount > 0;
 
   useEffect(() => {
     initSync();
@@ -62,7 +64,9 @@ export default function Header({ searchQuery = "", onSearchChange }: HeaderProps
       ? "Synchronisiert..."
       : pendingCount > 0
         ? `${pendingCount} Änderung${pendingCount === 1 ? "" : "en"} wartet auf Synchronisation`
-        : "Online – alles synchronisiert";
+        : hasDeadLetters
+          ? `${deadLetterCount} Änderung${deadLetterCount === 1 ? "" : "en"} konnte${deadLetterCount === 1 ? "" : "n"} nicht synchronisiert werden – tippen zum Ausblenden`
+          : "Online – alles synchronisiert";
 
   return (
     <header className="sticky top-0 z-40 w-full glass border-b border-[var(--border-color)] mb-6 safe-t">
@@ -90,24 +94,38 @@ export default function Header({ searchQuery = "", onSearchChange }: HeaderProps
 
         {/* Actions */}
         <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
-          {/* Sync / offline status */}
-          <div
-            className="relative w-9 h-9 rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)] shadow-sm flex items-center justify-center cursor-help"
-            title={syncTitle}
-          >
-            {!isOnline ? (
+          {/* Sync / offline status — becomes a dismiss button once there are
+              dead-lettered changes (permanently failed, won't auto-retry) */}
+          {hasDeadLetters ? (
+            <button
+              onClick={() => clearDeadLetters()}
+              className="relative w-9 h-9 rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)] shadow-sm flex items-center justify-center cursor-pointer"
+              title={syncTitle}
+            >
               <CloudOff className="w-4.5 h-4.5 text-amber-500" />
-            ) : isSyncing ? (
-              <RefreshCw className="w-4.5 h-4.5 text-primary animate-spin" />
-            ) : (
-              <Cloud className="w-4.5 h-4.5 text-[var(--text-muted)]" />
-            )}
-            {pendingCount > 0 && (
               <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-amber-500 text-white text-[9px] font-bold flex items-center justify-center">
-                {pendingCount}
+                {deadLetterCount}
               </span>
-            )}
-          </div>
+            </button>
+          ) : (
+            <div
+              className="relative w-9 h-9 rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)] shadow-sm flex items-center justify-center cursor-help"
+              title={syncTitle}
+            >
+              {!isOnline ? (
+                <CloudOff className="w-4.5 h-4.5 text-amber-500" />
+              ) : isSyncing ? (
+                <RefreshCw className="w-4.5 h-4.5 text-primary animate-spin" />
+              ) : (
+                <Cloud className="w-4.5 h-4.5 text-[var(--text-muted)]" />
+              )}
+              {pendingCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-amber-500 text-white text-[9px] font-bold flex items-center justify-center">
+                  {pendingCount}
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Search toggle */}
           {onSearchChange && (

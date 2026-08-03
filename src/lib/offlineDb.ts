@@ -4,7 +4,7 @@
 //     already-loaded data when the app starts without network.
 
 const DB_NAME = 'bb-notes-offline';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 export type SyncCollection = 'notes' | 'checklist_items';
 
@@ -17,6 +17,12 @@ export interface SyncOp {
 }
 
 export type CachedRecord = { id: string } & Record<string, unknown>;
+
+export interface DeadLetterEntry {
+  key: number;
+  op: SyncOp;
+  failedAt: string;
+}
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -35,6 +41,12 @@ function openDb(): Promise<IDBDatabase> {
         if (!db.objectStoreNames.contains('checklist_items')) {
           const items = db.createObjectStore('checklist_items', { keyPath: 'id' });
           items.createIndex('note', 'note');
+        }
+        if (!db.objectStoreNames.contains('deadLetters')) {
+          db.createObjectStore('deadLetters', { autoIncrement: true });
+        }
+        if (!db.objectStoreNames.contains('meta')) {
+          db.createObjectStore('meta');
         }
       };
       req.onsuccess = () => resolve(req.result);
@@ -142,4 +154,48 @@ export async function queueEntries(): Promise<QueueEntry[]> {
   const valuesReq = store.getAll();
   const [keys, values] = await Promise.all([asPromise(keysReq), asPromise(valuesReq)]);
   return keys.map((key, i) => ({ key: key as number, op: values[i] as SyncOp }));
+}
+
+// --- Dead-letter ---
+// Ops that fail during queue replay with a non-retryable error (validation /
+// permission — as opposed to "still offline") land here instead of being
+// silently dropped, so the failure stays visible (Header badge) and the op
+// itself isn't lost.
+
+export function deadLetterAdd(op: SyncOp): Promise<unknown> {
+  return withStore('deadLetters', 'readwrite', (s) => s.add({ op, failedAt: new Date().toISOString() }));
+}
+
+export function deadLetterCount(): Promise<number> {
+  return withStore('deadLetters', 'readonly', (s) => s.count());
+}
+
+export async function deadLetterEntries(): Promise<DeadLetterEntry[]> {
+  const db = await openDb();
+  const store = db.transaction('deadLetters', 'readonly').objectStore('deadLetters');
+  const keysReq = store.getAllKeys();
+  const valuesReq = store.getAll();
+  const [keys, values] = await Promise.all([asPromise(keysReq), asPromise(valuesReq)]);
+  return keys.map((key, i) => ({ key: key as number, ...(values[i] as { op: SyncOp; failedAt: string }) }));
+}
+
+export function deadLetterClear(): Promise<unknown> {
+  return withStore('deadLetters', 'readwrite', (s) => s.clear());
+}
+
+// --- Meta key/value store ---
+// Currently used to mirror the PocketBase auth token so the service worker's
+// Background Sync handler can authenticate — it has no access to
+// localStorage or cookies from the SW global scope.
+
+export function metaSet(key: string, value: string): Promise<unknown> {
+  return withStore('meta', 'readwrite', (s) => s.put(value, key));
+}
+
+export function metaDelete(key: string): Promise<unknown> {
+  return withStore('meta', 'readwrite', (s) => s.delete(key));
+}
+
+export function metaGet(key: string): Promise<string | undefined> {
+  return withStore('meta', 'readonly', (s) => s.get(key));
 }

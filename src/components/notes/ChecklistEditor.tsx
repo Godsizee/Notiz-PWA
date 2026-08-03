@@ -5,7 +5,7 @@ import { RecordModel } from 'pocketbase';
 import { pb } from '@/lib/pb';
 import { Palette, Pin, Archive, Trash2, Plus, X, CheckCircle2, Circle, Check, RefreshCw, MoreVertical, RotateCcw, GripVertical, Users } from 'lucide-react';
 import { useRealtimeChecklist } from '@/lib/useRealtime';
-import { applyChange, newRecordId } from '@/lib/sync';
+import { applyChange, newRecordId, isAbortError } from '@/lib/sync';
 import { usePresence } from '@/lib/usePresence';
 import { getNoteColorStyles, NOTE_COLORS } from '@/lib/colors';
 import { motion, AnimatePresence, Reorder, useDragControls } from 'framer-motion';
@@ -74,7 +74,8 @@ function ActiveChecklistRow({
       {/* Checkbox */}
       <button
         onClick={() => onToggle(item.id, item.is_completed)}
-        className="checkbox-animation text-[var(--text-muted)]/40 hover:text-primary transition-colors cursor-pointer shrink-0"
+        className="tap-target checkbox-animation text-[var(--text-muted)]/40 hover:text-primary transition-colors cursor-pointer shrink-0"
+        aria-label={isCompletedVisual ? 'Als offen markieren' : 'Als erledigt markieren'}
       >
         {isCompletedVisual ? (
           <CheckCircle2 className={`w-5 h-5 ${iconClass}`} />
@@ -119,8 +120,9 @@ function ActiveChecklistRow({
       {/* Delete cross */}
       <button
         onClick={() => onDelete(item.id)}
-        className="opacity-100 md:opacity-0 md:group-hover:opacity-100 text-[var(--text-muted)] hover:text-red-500 transition-all cursor-pointer p-1 shrink-0"
+        className="tap-target opacity-100 md:opacity-0 md:group-hover:opacity-100 text-[var(--text-muted)] hover:text-red-500 active:scale-90 transition-all cursor-pointer shrink-0"
         title="Eintrag entfernen"
+        aria-label="Eintrag entfernen"
       >
         <X className="w-4 h-4" />
       </button>
@@ -423,7 +425,10 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
     });
   };
 
-  // 450ms Visual Checkbox-Delay Engine
+  // Commit/undo debounce: tapping the same checkbox again within 450ms
+  // cancels the pending change entirely. The visible state (checkmark +
+  // which section the item sits in, via visualCompletion below) flips the
+  // instant you tap — this timer only delays the actual network write.
   const handleToggleItem = (itemId: string, currentStatus: boolean) => {
     hapticLight();
     if (togglingItems[itemId]) {
@@ -462,13 +467,17 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
           return next;
         });
       } catch (err) {
-        console.error("Failed to save checked status:", err);
-        notifyError("Status konnte nicht gespeichert werden.");
         setTogglingItems(prev => {
           const next = { ...prev };
           delete next[itemId];
           return next;
         });
+        // Auto-cancelled by a newer request — not a real failure, stay quiet.
+        // (Belt-and-suspenders: applyChange's requestKey: null should already
+        // prevent this from ever firing for this call.)
+        if (isAbortError(err)) return;
+        console.error("Failed to save checked status:", err);
+        notifyError("Status konnte nicht gespeichert werden.");
       }
     }, 450);
 
@@ -593,9 +602,15 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
     });
   };
 
+  // Visual completion respects an in-flight toggle immediately, so an item
+  // jumps to the other section the instant it's tapped instead of waiting for
+  // the debounced write below to resolve (see handleToggleItem).
+  const visualCompletion = (item: RecordModel) =>
+    togglingItems[item.id] !== undefined ? togglingItems[item.id].is_completed : item.is_completed;
+
   const visibleItems = items.filter(i => !pendingDeleteItemIds.has(i.id));
-  const activeItems = visibleItems.filter(i => !i.is_completed).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-  const completedItems = visibleItems.filter(i => i.is_completed).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const activeItems = visibleItems.filter(i => !visualCompletion(i)).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const completedItems = visibleItems.filter(i => visualCompletion(i)).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
   const colorStyles = getNoteColorStyles(color);
 
@@ -662,9 +677,7 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
         {/* Active Items list (reorderable) */}
         <Reorder.Group axis="y" values={activeItems} onReorder={handleReorder} className="space-y-1">
           {activeItems.map((item) => {
-            const isCompletedVisual = togglingItems[item.id] !== undefined
-              ? togglingItems[item.id].is_completed
-              : item.is_completed;
+            const isCompletedVisual = visualCompletion(item);
 
             return (
               <ActiveChecklistRow
@@ -716,9 +729,7 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
             <div className="space-y-1 opacity-70">
               <AnimatePresence initial={false}>
                 {completedItems.map((item) => {
-                  const isCompletedVisual = togglingItems[item.id] !== undefined
-                    ? togglingItems[item.id].is_completed
-                    : item.is_completed;
+                  const isCompletedVisual = visualCompletion(item);
 
                   return (
                     <motion.div
@@ -732,7 +743,8 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
                     >
                       <button
                         onClick={() => handleToggleItem(item.id, item.is_completed)}
-                        className={`checkbox-animation transition-colors cursor-pointer shrink-0 ${colorStyles.icon}`}
+                        className={`tap-target checkbox-animation transition-colors cursor-pointer shrink-0 ${colorStyles.icon}`}
+                        aria-label={isCompletedVisual ? 'Als offen markieren' : 'Als erledigt markieren'}
                       >
                         {isCompletedVisual ? (
                           <CheckCircle2 className="w-5 h-5" />
@@ -760,8 +772,9 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
 
                       <button
                         onClick={() => handleDeleteItem(item.id)}
-                        className="opacity-100 md:opacity-0 md:group-hover:opacity-100 text-[var(--text-muted)] hover:text-red-500 transition-all cursor-pointer p-1"
+                        className="tap-target opacity-100 md:opacity-0 md:group-hover:opacity-100 text-[var(--text-muted)] hover:text-red-500 active:scale-90 transition-all cursor-pointer"
                         title="Eintrag löschen"
+                        aria-label="Eintrag löschen"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>

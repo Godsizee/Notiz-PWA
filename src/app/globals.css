@@ -354,6 +354,22 @@ textarea {
   transform: scale(0.85);
 }
 
+/* Touch-friendly hit area for small icon-only buttons (checkbox, delete-X,
+   ...): the tappable box meets the ~44x44px minimum recommended for touch
+   targets while the icon glyph inside stays visually compact. */
+.tap-target {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Remove the ~300ms double-tap-to-zoom delay on interactive elements. */
+button, a, input, textarea, select, [role="button"] {
+  touch-action: manipulation;
+}
+
 input, textarea {
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }

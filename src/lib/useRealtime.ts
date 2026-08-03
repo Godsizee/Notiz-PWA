@@ -1,16 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { pb } from '@/lib/pb';
 import { RecordModel } from 'pocketbase';
-import { onLocalChange } from '@/lib/sync';
+import { onLocalChange, isAbortError } from '@/lib/sync';
 import { useSyncStore } from '@/store/useSyncStore';
 import { cacheGetAll, cacheItemsByNote, cacheReplaceNotes, cacheReplaceItems } from '@/lib/offlineDb';
-
-// PocketBase aborts a request (rejecting with isAbort) when it is auto-cancelled
-// by a newer same-key request. Such aborts are expected and must not be treated
-// as real errors that clear the UI.
-function isAbortError(err: unknown): boolean {
-  return !!(err && typeof err === 'object' && (err as { isAbort?: boolean }).isAbort);
-}
 
 // Network failure (offline / server unreachable) — not an auto-cancel abort.
 function isOfflineError(err: unknown): boolean {
