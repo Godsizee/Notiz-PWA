@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { pb } from '@/lib/pb';
 import { RecordModel } from 'pocketbase';
 import { onLocalChange, isAbortError } from '@/lib/sync';
@@ -41,6 +41,8 @@ function applyEvent(
   }
   return sort ? next.sort(sort) : next;
 }
+
+const byOrder = (a: RecordModel, b: RecordModel) => (a.order ?? 0) - (b.order ?? 0);
 
 export function useRealtimeNotes() {
   const [notes, setNotes] = useState<RecordModel[]>([]);
@@ -114,8 +116,6 @@ export function useRealtimeImages() {
   const [images, setImages] = useState<RecordModel[]>([]);
   const flushSerial = useSyncStore((s) => s.flushSerial);
 
-  const byOrder = (a: RecordModel, b: RecordModel) => (a.order ?? 0) - (b.order ?? 0);
-
   useEffect(() => {
     let cancelled = false;
 
@@ -177,9 +177,37 @@ export function useRealtimeChecklist(noteId: string) {
   const [items, setItems] = useState<RecordModel[]>([]);
   const flushSerial = useSyncStore((s) => s.flushSerial);
 
-  const byOrder = (a: RecordModel, b: RecordModel) => (a.order ?? 0) - (b.order ?? 0);
+  // While the user drags an item, incoming events must not rewrite the list
+  // under their finger. Every setItems re-renders Reorder.Group, which drops
+  // the measurement registry it reorders against and re-measures every row —
+  // a burst of echoes mid-gesture is what makes dragging feel sticky. Buffer
+  // them instead and replay in order once the drag ends.
+  const suspendedRef = useRef(false);
+  const bufferedRef = useRef<{ action: string; record: RecordModel }[]>([]);
+
+  const setSyncSuspended = useCallback((suspended: boolean) => {
+    suspendedRef.current = suspended;
+    if (suspended) return;
+    const buffered = bufferedRef.current;
+    if (buffered.length === 0) return;
+    bufferedRef.current = [];
+    setItems((prev) =>
+      buffered.reduce((acc, e) => applyEvent(acc, e.action, e.record, byOrder), prev)
+    );
+  }, []);
+
+  const ingest = useCallback((action: string, record: RecordModel) => {
+    if (suspendedRef.current) {
+      bufferedRef.current.push({ action, record });
+      return;
+    }
+    setItems((prev) => applyEvent(prev, action, record, byOrder));
+  }, []);
 
   useEffect(() => {
+    // Anything buffered belongs to the list we're leaving.
+    bufferedRef.current = [];
+
     if (!noteId) {
       setItems([]);
       return;
@@ -221,7 +249,7 @@ export function useRealtimeChecklist(noteId: string) {
     pb.collection('checklist_items')
       .subscribe('*', function (e) {
         if (e.record.note !== noteId) return;
-        setItems((prev) => applyEvent(prev, e.action, e.record, byOrder));
+        ingest(e.action, e.record);
       })
       .then((fn) => { unsubscribe = fn; })
       .catch((err) => console.error("Failed to subscribe to checklist items:", err));
@@ -230,7 +258,7 @@ export function useRealtimeChecklist(noteId: string) {
       cancelled = true;
       unsubscribe?.();
     };
-  }, [noteId, flushSerial]);
+  }, [noteId, flushSerial, ingest]);
 
   // Offline writes bypass the server → mirror them into the UI immediately.
   useEffect(() => {
@@ -238,9 +266,9 @@ export function useRealtimeChecklist(noteId: string) {
     return onLocalChange((change) => {
       if (change.collection !== 'checklist_items') return;
       if (change.action !== 'delete' && change.record.note !== noteId) return;
-      setItems((prev) => applyEvent(prev, change.action, change.record, byOrder));
+      ingest(change.action, change.record);
     });
-  }, [noteId]);
+  }, [noteId, ingest]);
 
-  return { items, setItems };
+  return { items, setItems, setSyncSuspended };
 }

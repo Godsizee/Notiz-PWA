@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { RecordModel } from 'pocketbase';
 import { pb } from '@/lib/pb';
 import { Palette, Pin, Archive, Trash2, Plus, X, CheckCircle2, Circle, Check, RefreshCw, MoreVertical, RotateCcw, GripVertical, Users } from 'lucide-react';
@@ -35,9 +35,15 @@ interface ActiveRowProps {
   onDelete: (id: string) => void;
   onEnter: (item: RecordModel) => void;
   onBackspaceEmpty: (item: RecordModel) => void;
+  onDragStart: () => void;
+  onDragEnd: () => void;
 }
 
-function ActiveChecklistRow({
+// memo matters here: Reorder re-renders the whole group on every crossing, and
+// every row that re-renders is a row framer-motion has to re-measure (each one
+// carries `layout`). With stable callbacks from the parent, only the rows whose
+// item object actually changed do any work.
+const ActiveChecklistRow = memo(function ActiveChecklistRow({
   item,
   isCompletedVisual,
   iconClass,
@@ -47,9 +53,12 @@ function ActiveChecklistRow({
   onDelete,
   onEnter,
   onBackspaceEmpty,
+  onDragStart,
+  onDragEnd,
 }: ActiveRowProps) {
   const controls = useDragControls();
   const [isFocused, setIsFocused] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const { quantity, text: restText } = parseQuantity(item.text);
 
   return (
@@ -58,8 +67,13 @@ function ActiveChecklistRow({
       dragListener={false}
       dragControls={controls}
       layoutId={item.id}
-      whileDrag={{ scale: 1.02, boxShadow: '0 10px 30px -12px rgba(0,0,0,0.35)' }}
-      className="flex items-center gap-2 group py-1.5 bg-transparent rounded-xl"
+      onDragStart={() => { setIsDragging(true); onDragStart(); }}
+      onDragEnd={() => { setIsDragging(false); onDragEnd(); }}
+      // Only `scale` is animated: box-shadow can't be composited, so animating
+      // it repaints the row every frame of the lift. A plain class gives the
+      // same look for free.
+      whileDrag={{ scale: 1.02 }}
+      className={`flex items-center gap-2 group py-1.5 bg-transparent rounded-xl ${isDragging ? 'shadow-[0_10px_30px_-12px_rgba(0,0,0,0.35)]' : ''}`}
     >
       {/* Drag handle */}
       <button
@@ -128,7 +142,137 @@ function ActiveChecklistRow({
       </button>
     </Reorder.Item>
   );
+});
+
+interface ActiveListProps {
+  /** Active items in their persisted order (sorted by `order`). */
+  items: RecordModel[];
+  iconClass: string;
+  registerRef: (id: string, el: HTMLInputElement | null) => void;
+  onToggle: (id: string, current: boolean) => void;
+  onUpdateText: (id: string, text: string) => void;
+  onDelete: (id: string) => void;
+  onEnter: (item: RecordModel) => void;
+  onBackspaceEmpty: (item: RecordModel) => void;
+  /** Called once per drag, on drop, with the final id order. */
+  onCommitOrder: (ids: string[]) => void;
+  onDragActiveChange: (active: boolean) => void;
 }
+
+/**
+ * The reorderable active list, deliberately split out from the editor.
+ *
+ * Two things make freehand dragging smooth, and both live here:
+ *
+ * 1. The in-flight order is kept as a list of ids, not by rewriting each
+ *    item's `order`. Reorder.Group tracks items by *object identity* — it
+ *    keeps a measurement registry keyed on the exact object passed as
+ *    `value`. Cloning items mid-drag (`{...it, order: idx}`) invalidated
+ *    every entry on every crossing, so `checkReorder` could no longer find
+ *    the dragged item and the list stopped following the finger until the
+ *    next layout pass. Item objects now stay untouched until the drop.
+ *
+ * 2. The order state lives in this component instead of the editor, so a
+ *    crossing re-renders the active list only — not the title, the toolbar,
+ *    or the "Erledigt" section, whose rows all carry `layout` and would
+ *    otherwise be re-measured on every crossing too.
+ */
+const ActiveChecklistList = memo(function ActiveChecklistList({
+  items,
+  iconClass,
+  registerRef,
+  onToggle,
+  onUpdateText,
+  onDelete,
+  onEnter,
+  onBackspaceEmpty,
+  onCommitOrder,
+  onDragActiveChange,
+}: ActiveListProps) {
+  const [dragOrderIds, setDragOrderIds] = useState<string[] | null>(null);
+  // Mirrors of the above that drag-end can read synchronously.
+  const dragOrderIdsRef = useRef<string[] | null>(null);
+  const isDraggingRef = useRef(false);
+
+  const ordered = useMemo(() => {
+    if (!dragOrderIds) return items;
+    const rank = new Map(dragOrderIds.map((id, idx) => [id, idx]));
+    // Items that appeared mid-drag (a collaborator's insert) have no rank —
+    // sort is stable, so they park at the end instead of shuffling the list
+    // under the finger.
+    return items
+      .slice()
+      .sort(
+        (a, b) =>
+          (rank.get(a.id) ?? Number.MAX_SAFE_INTEGER) -
+          (rank.get(b.id) ?? Number.MAX_SAFE_INTEGER)
+      );
+  }, [items, dragOrderIds]);
+
+  const handleReorder = useCallback(
+    (newOrder: RecordModel[]) => {
+      hapticLight();
+      const ids = newOrder.map((i) => i.id);
+      if (isDraggingRef.current) {
+        dragOrderIdsRef.current = ids;
+        setDragOrderIds(ids);
+        return;
+      }
+      // Reorder outside of a pointer drag — nothing to buffer, persist now.
+      onCommitOrder(ids);
+    },
+    [onCommitOrder]
+  );
+
+  const handleDragStart = useCallback(() => {
+    isDraggingRef.current = true;
+    onDragActiveChange(true);
+  }, [onDragActiveChange]);
+
+  const handleDragEnd = useCallback(() => {
+    isDraggingRef.current = false;
+    onDragActiveChange(false);
+    const ids = dragOrderIdsRef.current;
+    dragOrderIdsRef.current = null;
+    setDragOrderIds(null);
+    // Both state updates batch with the parent's, so the list never flashes
+    // back to the pre-drag order between dropping `dragOrderIds` and the
+    // parent baking the new `order` values into `items`.
+    if (ids) onCommitOrder(ids);
+  }, [onCommitOrder, onDragActiveChange]);
+
+  // Closing the sheet mid-drag must not silently drop the new order.
+  const commitRef = useRef(onCommitOrder);
+  useEffect(() => { commitRef.current = onCommitOrder; }, [onCommitOrder]);
+  useEffect(() => {
+    return () => {
+      const ids = dragOrderIdsRef.current;
+      if (ids) commitRef.current(ids);
+    };
+  }, []);
+
+  return (
+    <Reorder.Group axis="y" values={ordered} onReorder={handleReorder} className="space-y-1">
+      {ordered.map((item) => (
+        <ActiveChecklistRow
+          key={item.id}
+          item={item}
+          // Items only reach this list while they read as open.
+          isCompletedVisual={false}
+          iconClass={iconClass}
+          registerRef={registerRef}
+          onToggle={onToggle}
+          onUpdateText={onUpdateText}
+          onDelete={onDelete}
+          onEnter={onEnter}
+          onBackspaceEmpty={onBackspaceEmpty}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        />
+      ))}
+    </Reorder.Group>
+  );
+});
 
 export default function ChecklistEditor({ note, onClose, onRequestDelete }: ChecklistEditorProps) {
   const [title, setTitle] = useState(note?.title || '');
@@ -150,13 +294,13 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
   // new key mounts a fresh ConfettiBurst.
   const [confettiKey, setConfettiKey] = useState(0);
 
-  const { items, setItems } = useRealtimeChecklist(activeNoteId || '');
+  const { items, setItems, setSyncSuspended } = useRealtimeChecklist(activeNoteId || '');
   const { others } = usePresence(activeNoteId);
   const showToast = useToastStore((s) => s.showToast);
 
-  const notifyError = (message: string) => {
+  const notifyError = useCallback((message: string) => {
     showToast({ message, tone: 'danger', duration: 3500 });
-  };
+  }, [showToast]);
 
   // Refs for unmount-cleanup (always hold latest values without re-registering the effect)
   const activeNoteIdRef = useRef<string | undefined>(note?.id);
@@ -166,6 +310,11 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
   const isPinnedRef = useRef(note?.is_pinned || false);
   const isArchivedRef = useRef(note?.is_archived || false);
   const isSharedRef = useRef(note?.is_shared || false);
+  // Mirrors read by the row callbacks below, so those can stay referentially
+  // stable and the memoized rows don't re-render on unrelated state changes.
+  const togglingItemsRef = useRef(togglingItems);
+  const activeItemsRef = useRef<RecordModel[]>([]);
+  useEffect(() => { togglingItemsRef.current = togglingItems; }, [togglingItems]);
   useEffect(() => { activeNoteIdRef.current = activeNoteId; }, [activeNoteId]);
   useEffect(() => { titleRef.current = title; }, [title]);
   useEffect(() => { itemsRef.current = items; }, [items]);
@@ -187,9 +336,9 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
   const titleInputRef = useRef<HTMLInputElement>(null);
   const itemInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
-  const registerRef = (id: string, el: HTMLInputElement | null) => {
+  const registerRef = useCallback((id: string, el: HTMLInputElement | null) => {
     itemInputRefs.current[id] = el;
-  };
+  }, []);
 
   // Clean up timers on unmount
   useEffect(() => {
@@ -284,8 +433,8 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
     };
   }, [performSave]);
 
-  const ensureNoteExists = async () => {
-    if (activeNoteId) return activeNoteId;
+  const ensureNoteExists = useCallback(async () => {
+    if (activeNoteIdRef.current) return activeNoteIdRef.current;
 
     const user = pb.authStore.model || pb.authStore.record;
     const record = await applyChange({
@@ -293,18 +442,19 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
       action: 'create',
       id: newRecordId(),
       data: {
-        title: title || 'Unbenannte Liste',
+        title: titleRef.current || 'Unbenannte Liste',
         type: 'checklist',
-        color,
-        is_pinned: isPinned,
-        is_archived: isArchived,
-        is_shared: isShared,
+        color: colorRef.current,
+        is_pinned: isPinnedRef.current,
+        is_archived: isArchivedRef.current,
+        is_shared: isSharedRef.current,
         owner: user?.id,
       },
     });
+    activeNoteIdRef.current = record.id;
     setActiveNoteId(record.id);
     return record.id;
-  };
+  }, []);
 
   const nextOrder = () => items.reduce((max, i) => Math.max(max, i.order ?? 0), -1) + 1;
 
@@ -338,10 +488,11 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
 
   // Enter on an existing item → insert a new empty item directly below it,
   // using a fractional order so no bulk reindex is needed, then focus it.
-  const handleInsertBelow = async (currentItem: RecordModel) => {
+  const handleInsertBelow = useCallback(async (currentItem: RecordModel) => {
     const noteId = await ensureNoteExists();
-    const idx = activeItems.findIndex(i => i.id === currentItem.id);
-    const next = activeItems[idx + 1];
+    const list = activeItemsRef.current;
+    const idx = list.findIndex(i => i.id === currentItem.id);
+    const next = list[idx + 1];
     const curOrder = currentItem.order ?? 0;
     const newOrder = next ? (curOrder + (next.order ?? curOrder + 2)) / 2 : curOrder + 1;
 
@@ -366,21 +517,31 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
       console.error("Failed to insert checklist item:", err);
       notifyError("Eintrag konnte nicht eingefügt werden.");
     }
-  };
+  }, [ensureNoteExists, notifyError, setItems]);
+
+  const handleDeleteItem = useCallback(async (itemId: string) => {
+    try {
+      await applyChange({ collection: 'checklist_items', action: 'delete', id: itemId });
+    } catch (err) {
+      console.error("Failed to delete checklist item:", err);
+      notifyError("Eintrag konnte nicht gelöscht werden.");
+    }
+  }, [notifyError]);
 
   // Backspace on an empty item → delete it and focus the previous item.
-  const handleBackspaceEmpty = (item: RecordModel) => {
-    const idx = activeItems.findIndex(i => i.id === item.id);
-    const prev = activeItems[idx - 1];
+  const handleBackspaceEmpty = useCallback((item: RecordModel) => {
+    const list = activeItemsRef.current;
+    const idx = list.findIndex(i => i.id === item.id);
+    const prev = list[idx - 1];
     handleDeleteItem(item.id);
     if (prev) {
       setPendingFocusId(prev.id);
     } else {
       titleInputRef.current?.focus();
     }
-  };
+  }, [handleDeleteItem]);
 
-  const handleUpdateItem = async (itemId: string, text: string) => {
+  const handleUpdateItem = useCallback(async (itemId: string, text: string) => {
     // Optimistic local update keeps the input responsive between realtime echoes.
     setItems(prev => prev.map(i => (i.id === itemId ? { ...i, text } : i)));
     try {
@@ -389,50 +550,63 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
         collection: 'checklist_items',
         action: 'update',
         id: itemId,
-        data: { note: activeNoteId, text },
+        data: { note: activeNoteIdRef.current, text },
       });
     } catch (err) {
       console.error("Failed to update item text:", err);
       notifyError("Änderung konnte nicht gespeichert werden.");
     }
-  };
+  }, [notifyError, setItems]);
 
-  // Drag-reorder: optimistic local order update, then persist changed orders.
-  const handleReorder = (newOrder: RecordModel[]) => {
-    hapticLight();
-    setItems(prev => {
-      const completed = prev.filter(i => i.is_completed);
-      const reordered = newOrder.map((it, idx) => ({ ...it, order: idx }));
-      return [...reordered, ...completed];
-    });
+  // Drag-reorder, committed once on drop rather than on every crossing.
+  //
+  // Writing per crossing meant a single drag across five rows fired ~20 PUTs
+  // while the finger was still down; each response echoed back over realtime
+  // and replaced every record object in `items`, which re-rendered and
+  // re-measured the whole list mid-gesture. That, not rendering cost, is what
+  // made dragging feel sticky.
+  const handleCommitOrder = useCallback((ids: string[]) => {
+    const noteId = activeNoteIdRef.current;
+    const nextOrders = new Map(ids.map((id, idx) => [id, idx]));
+
+    // Bake the new positions into the local list so the order survives the
+    // drag state being cleared, without waiting for the realtime echoes.
+    setItems(prev => prev.map(i => {
+      const next = nextOrders.get(i.id);
+      return next === undefined || i.order === next ? i : { ...i, order: next };
+    }));
+
+    // itemsRef still holds the pre-drop orders — the baseline for "what
+    // actually moved", so an untouched list writes nothing at all.
+    const before = new Map(itemsRef.current.map(i => [i.id, i.order ?? -1]));
     let reorderFailed = false;
-    newOrder.forEach((it, idx) => {
-      if ((it.order ?? -1) !== idx) {
-        applyChange({
-          collection: 'checklist_items',
-          action: 'update',
-          id: it.id,
-          data: { note: activeNoteId, order: idx },
-        })
-          .catch(err => {
-            console.error("Failed to persist reorder:", err);
-            if (!reorderFailed) {
-              reorderFailed = true;
-              notifyError("Sortierung konnte nicht gespeichert werden.");
-            }
-          });
-      }
+    ids.forEach((id, idx) => {
+      if (before.get(id) === idx) return;
+      applyChange({
+        collection: 'checklist_items',
+        action: 'update',
+        id,
+        data: { note: noteId, order: idx },
+      })
+        .catch(err => {
+          console.error("Failed to persist reorder:", err);
+          if (!reorderFailed) {
+            reorderFailed = true;
+            notifyError("Sortierung konnte nicht gespeichert werden.");
+          }
+        });
     });
-  };
+  }, [notifyError, setItems]);
 
   // Commit/undo debounce: tapping the same checkbox again within 450ms
   // cancels the pending change entirely. The visible state (checkmark +
   // which section the item sits in, via visualCompletion below) flips the
   // instant you tap — this timer only delays the actual network write.
-  const handleToggleItem = (itemId: string, currentStatus: boolean) => {
+  const handleToggleItem = useCallback((itemId: string, currentStatus: boolean) => {
     hapticLight();
-    if (togglingItems[itemId]) {
-      clearTimeout(togglingItems[itemId].timer);
+    const pending = togglingItemsRef.current[itemId];
+    if (pending) {
+      clearTimeout(pending.timer);
       setTogglingItems(prev => {
         const next = { ...prev };
         delete next[itemId];
@@ -445,7 +619,7 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
 
     // Letzter visuell offener Eintrag wird abgehakt → kleine Feier.
     if (targetStatus) {
-      const visuallyOpen = activeItems.filter((i) => !togglingItems[i.id]?.is_completed);
+      const visuallyOpen = activeItemsRef.current;
       if (visuallyOpen.length === 1 && visuallyOpen[0].id === itemId) {
         hapticHeavy();
         setConfettiKey((k) => k + 1);
@@ -458,7 +632,7 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
           collection: 'checklist_items',
           action: 'update',
           id: itemId,
-          data: { note: activeNoteId, is_completed: targetStatus },
+          data: { note: activeNoteIdRef.current, is_completed: targetStatus },
         });
 
         setTogglingItems(prev => {
@@ -485,16 +659,7 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
       ...prev,
       [itemId]: { is_completed: targetStatus, timer }
     }));
-  };
-
-  const handleDeleteItem = async (itemId: string) => {
-    try {
-      await applyChange({ collection: 'checklist_items', action: 'delete', id: itemId });
-    } catch (err) {
-      console.error("Failed to delete checklist item:", err);
-      notifyError("Eintrag konnte nicht gelöscht werden.");
-    }
-  };
+  }, [notifyError]);
 
   const handleDeleteNote = () => {
     // Route through the app-level soft-delete + undo toast when available.
@@ -608,11 +773,28 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
   const visualCompletion = (item: RecordModel) =>
     togglingItems[item.id] !== undefined ? togglingItems[item.id].is_completed : item.is_completed;
 
-  const visibleItems = items.filter(i => !pendingDeleteItemIds.has(i.id));
-  const activeItems = visibleItems.filter(i => !visualCompletion(i)).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-  const completedItems = visibleItems.filter(i => visualCompletion(i)).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  // Split in one memoized pass, so both lists keep their identity across
+  // renders that don't touch them (auto-save ticks, presence heartbeats) —
+  // that's what lets the active list skip re-rendering, and with it a full
+  // framer-motion re-measure of every row.
+  const { activeItems, completedItems } = useMemo(() => {
+    const open: RecordModel[] = [];
+    const done: RecordModel[] = [];
+    for (const item of items) {
+      if (pendingDeleteItemIds.has(item.id)) continue;
+      const pending = togglingItems[item.id];
+      const isDone = pending !== undefined ? pending.is_completed : item.is_completed;
+      (isDone ? done : open).push(item);
+    }
+    const byOrder = (a: RecordModel, b: RecordModel) => (a.order ?? 0) - (b.order ?? 0);
+    open.sort(byOrder);
+    done.sort(byOrder);
+    return { activeItems: open, completedItems: done };
+  }, [items, pendingDeleteItemIds, togglingItems]);
+  useEffect(() => { activeItemsRef.current = activeItems; }, [activeItems]);
 
   const colorStyles = getNoteColorStyles(color);
+  const iconClass = colorStyles.icon;
 
   return (
     <div
@@ -671,30 +853,24 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
         />
       </div>
 
-      {/* Checklist Body (Scrollable) */}
-      <div className="flex-1 overflow-y-auto px-6 space-y-1 pb-32">
+      {/* Checklist Body (Scrollable) — layoutScroll lets framer-motion offset
+          its layout measurements by this container's scroll position, so drag
+          targets stay accurate once the list has been scrolled. */}
+      <motion.div layoutScroll className="flex-1 overflow-y-auto px-6 space-y-1 pb-32">
 
         {/* Active Items list (reorderable) */}
-        <Reorder.Group axis="y" values={activeItems} onReorder={handleReorder} className="space-y-1">
-          {activeItems.map((item) => {
-            const isCompletedVisual = visualCompletion(item);
-
-            return (
-              <ActiveChecklistRow
-                key={item.id}
-                item={item}
-                isCompletedVisual={isCompletedVisual}
-                iconClass={colorStyles.icon}
-                registerRef={registerRef}
-                onToggle={handleToggleItem}
-                onUpdateText={handleUpdateItem}
-                onDelete={handleDeleteItem}
-                onEnter={handleInsertBelow}
-                onBackspaceEmpty={handleBackspaceEmpty}
-              />
-            );
-          })}
-        </Reorder.Group>
+        <ActiveChecklistList
+          items={activeItems}
+          iconClass={iconClass}
+          registerRef={registerRef}
+          onToggle={handleToggleItem}
+          onUpdateText={handleUpdateItem}
+          onDelete={handleDeleteItem}
+          onEnter={handleInsertBelow}
+          onBackspaceEmpty={handleBackspaceEmpty}
+          onCommitOrder={handleCommitOrder}
+          onDragActiveChange={setSyncSuspended}
+        />
 
         {/* Quick Add Row */}
         <div className="flex items-center gap-3 py-2 border-t border-[var(--border-color)] mt-1">
@@ -785,7 +961,7 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
             </div>
           </div>
         )}
-      </div>
+      </motion.div>
 
       {/* Floating Design & Bulk Action Toolbar */}
       <div
