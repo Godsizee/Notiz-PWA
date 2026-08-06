@@ -113,8 +113,11 @@ export default function NoteEditor({ note, imagesByNote, onClose, onRequestDelet
   // edit when the sheet closes faster than the debounce window.
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // `owner` is deliberately absent: on a shared note the other user's
+  // auto-save would otherwise rewrite owner to *themselves*, silently
+  // transferring the note — and locking the original owner out the moment
+  // sharing is switched off again. It is only set when creating (newNoteData).
   const noteData = useCallback(() => {
-    const user = pb.authStore.model || pb.authStore.record;
     return {
       title: titleRef.current,
       content: contentRef.current,
@@ -123,9 +126,13 @@ export default function NoteEditor({ note, imagesByNote, onClose, onRequestDelet
       is_pinned: isPinnedRef.current,
       is_archived: isArchivedRef.current,
       is_shared: isSharedRef.current,
-      owner: user?.id,
     };
   }, []);
+
+  const newNoteData = useCallback(() => {
+    const user = pb.authStore.model || pb.authStore.record;
+    return { ...noteData(), owner: user?.id };
+  }, [noteData]);
 
   /**
    * Guarantees a persisted note to hang images off. A new note is normally
@@ -140,12 +147,12 @@ export default function NoteEditor({ note, imagesByNote, onClose, onRequestDelet
       collection: 'notes',
       action: 'create',
       id: newRecordId(),
-      data: noteData(),
+      data: newNoteData(),
     });
     activeNoteIdRef.current = record.id;
     setActiveNoteId(record.id);
     return record.id;
-  }, [noteData]);
+  }, [newNoteData]);
 
   const performSave = useCallback(async () => {
     const id = activeNoteIdRef.current;
@@ -164,7 +171,7 @@ export default function NoteEditor({ note, imagesByNote, onClose, onRequestDelet
           collection: 'notes',
           action: 'create',
           id: newRecordId(),
-          data: noteData(),
+          data: newNoteData(),
         });
         activeNoteIdRef.current = record.id;
         setActiveNoteId(record.id);
@@ -175,7 +182,7 @@ export default function NoteEditor({ note, imagesByNote, onClose, onRequestDelet
       // keep saving state visible slightly longer for smooth visual transitions
       setTimeout(() => setIsSaving(false), 400);
     }
-  }, [isEmptyNote, noteData]);
+  }, [isEmptyNote, noteData, newNoteData]);
 
   useEffect(() => {
     saveTimerRef.current = setTimeout(() => {
@@ -188,7 +195,12 @@ export default function NoteEditor({ note, imagesByNote, onClose, onRequestDelet
         saveTimerRef.current = null;
       }
     };
-  }, [title, content, color, isPinned, isArchived, activeNoteId, performSave]);
+    // NB: none of these are read in the effect body — performSave() goes
+    // through refs. This list *is* the "what should schedule a save" set, so
+    // every piece of note state with its own toolbar button has to appear
+    // here. `isShared` was missing, which is why tapping Teilen on a note
+    // never persisted unless some other edit happened to save it along.
+  }, [title, content, color, isPinned, isArchived, isShared, activeNoteId, performSave]);
 
   // Flush a still-pending save immediately on tab-hide/close/unmount so a
   // quick edit-then-leave doesn't drop the last 500ms of typing.

@@ -371,6 +371,10 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
     if (!id && !titleRef.current.trim()) return;
 
     const user = pb.authStore.model || pb.authStore.record;
+    // `owner` is deliberately not part of the update payload: on a shared list
+    // the other user's auto-save would otherwise rewrite owner to *themselves*,
+    // silently transferring the list — and locking the original owner out the
+    // moment sharing is switched off again.
     const data = {
       title: titleRef.current || 'Unbenannte Liste',
       type: 'checklist',
@@ -378,7 +382,6 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
       is_pinned: isPinnedRef.current,
       is_archived: isArchivedRef.current,
       is_shared: isSharedRef.current,
-      owner: user?.id,
     };
 
     try {
@@ -390,7 +393,7 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
           collection: 'notes',
           action: 'create',
           id: newRecordId(),
-          data,
+          data: { ...data, owner: user?.id },
         });
         activeNoteIdRef.current = record.id;
         setActiveNoteId(record.id);
@@ -413,7 +416,12 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
         saveTimerRef.current = null;
       }
     };
-  }, [title, color, isPinned, isArchived, activeNoteId, performSave]);
+    // NB: none of these are read in the effect body — performSave() goes
+    // through refs. This list *is* the "what should schedule a save" set, so
+    // every piece of note state with its own toolbar button has to appear
+    // here. `isShared` was missing, which is why tapping Teilen on a note
+    // never persisted unless some other edit happened to save it along.
+  }, [title, color, isPinned, isArchived, isShared, activeNoteId, performSave]);
 
   // Flush a still-pending save immediately on tab-hide/close/unmount so a
   // quick edit-then-leave doesn't drop the last 500ms of typing.

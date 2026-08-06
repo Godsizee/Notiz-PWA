@@ -28,12 +28,18 @@ function applyEvent(
   sort?: (a: RecordModel, b: RecordModel) => number
 ): RecordModel[] {
   let next: RecordModel[];
-  if (action === 'create') {
+  if (action === 'create' || action === 'update') {
+    // Both upsert, and 'update' genuinely needs to insert: PocketBase filters
+    // realtime events through the collection's list rule, so a record we were
+    // never allowed to see arrives as an *update* the moment it starts
+    // matching — which is exactly what happens when the other user flips
+    // is_shared. Mapping only over existing records dropped that event on the
+    // floor and the note stayed invisible until the next full refetch.
+    // Creates are deduped for the same reason they always were: an
+    // offline-created record arrives twice (local echo + realtime echo).
     next = prev.some((r) => r.id === record.id)
       ? prev.map((r) => (r.id === record.id ? record : r))
       : [record, ...prev];
-  } else if (action === 'update') {
-    next = prev.map((r) => (r.id === record.id ? record : r));
   } else if (action === 'delete') {
     next = prev.filter((r) => r.id !== record.id);
   } else {
