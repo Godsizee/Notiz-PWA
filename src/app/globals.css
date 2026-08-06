@@ -365,6 +365,17 @@ textarea {
   justify-content: center;
 }
 
+/* Kompaktere Variante für Checklisten-Zeilen. Die Trefferfläche bestimmt dort
+   die Zeilenhöhe, ein Listeneintrag ist aber keine 44px hoch "gemeint" — bei
+   40px stehen die Einträge spürbar dichter und bleiben gut treffbar. */
+.tap-target-sm {
+  min-width: 40px;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* Remove the ~300ms double-tap-to-zoom delay on interactive elements.
  *
  * This MUST stay inside @layer base. Unlayered rules outdo every layered one

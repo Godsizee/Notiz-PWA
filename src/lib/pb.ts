@@ -1,4 +1,4 @@
-import PocketBase from 'pocketbase';
+import PocketBase, { RecordModel } from 'pocketbase';
 import { metaSet, metaDelete } from '@/lib/offlineDb';
 
 const pbUrl = process.env.NEXT_PUBLIC_POCKETBASE_URL || 'https://pbnote.dasdann.jetzt';
@@ -48,6 +48,26 @@ if (typeof window !== 'undefined') {
       metaDelete('authToken').catch(() => {});
     }
   });
+}
+
+/** Id of the signed-in user, or undefined when signed out. */
+export function currentUserId(): string | undefined {
+  const user = pb.authStore.model || pb.authStore.record;
+  return (user?.id as string | undefined) || undefined;
+}
+
+/**
+ * Sharing is the owner's switch, so only the owner may flip it.
+ *
+ * Visibility is `owner = @request.auth.id || is_shared = true`. Un-sharing a
+ * note you don't own therefore removes it from your own list — and you can no
+ * longer see it to undo that. The write succeeds, so it looks like the app
+ * swallowed the note. A note that doesn't exist yet is yours by definition.
+ */
+export function isOwnedByMe(note?: RecordModel | null): boolean {
+  if (!note) return true;
+  const me = currentUserId();
+  return !!me && note.owner === me;
 }
 
 // Helper for server-side Pocketbase instance (to be used in route handlers, server components)

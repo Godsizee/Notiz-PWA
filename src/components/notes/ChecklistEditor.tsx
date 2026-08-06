@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { RecordModel } from 'pocketbase';
-import { pb } from '@/lib/pb';
+import { pb, isOwnedByMe } from '@/lib/pb';
 import { Palette, Pin, Archive, Trash2, Plus, X, CheckCircle2, Circle, Check, RefreshCw, MoreVertical, RotateCcw, GripVertical, Users } from 'lucide-react';
 import { useRealtimeChecklist } from '@/lib/useRealtime';
 import { applyChange, newRecordId, isAbortError } from '@/lib/sync';
@@ -73,15 +73,16 @@ const ActiveChecklistRow = memo(function ActiveChecklistRow({
       // it repaints the row every frame of the lift. A plain class gives the
       // same look for free.
       whileDrag={{ scale: 1.02 }}
-      className={`flex items-center gap-2 group py-1.5 bg-transparent rounded-xl ${isDragging ? 'shadow-[0_10px_30px_-12px_rgba(0,0,0,0.35)]' : ''}`}
+      className={`flex items-center gap-2 group bg-transparent rounded-xl ${isDragging ? 'shadow-[0_10px_30px_-12px_rgba(0,0,0,0.35)]' : ''}`}
     >
-      {/* Drag handle. The hit area is 32x44 rather than the icon's 16x16: the
-          checkbox and delete buttons next to it already claim 44px, and a
+      {/* Drag handle. The hit area is 32x40 rather than the icon's 16x16: a
           grip you have to hit within 20px is one every second touch misses —
-          landing on the row instead, which just scrolls. */}
+          landing on the row instead, which just scrolls. It matches the
+          checkbox and delete buttons (tap-target-sm), which together set the
+          row height. */}
       <button
         onPointerDown={(e) => controls.start(e)}
-        className="drag-handle w-8 min-h-11 flex items-center justify-center cursor-grab active:cursor-grabbing text-[var(--text-muted)]/30 hover:text-[var(--text-muted)] transition-colors shrink-0 -ml-1"
+        className="drag-handle w-8 min-h-10 flex items-center justify-center cursor-grab active:cursor-grabbing text-[var(--text-muted)]/30 hover:text-[var(--text-muted)] transition-colors shrink-0 -ml-1"
         title="Zum Sortieren ziehen"
         aria-label="Eintrag verschieben"
       >
@@ -91,7 +92,7 @@ const ActiveChecklistRow = memo(function ActiveChecklistRow({
       {/* Checkbox */}
       <button
         onClick={() => onToggle(item.id, item.is_completed)}
-        className="tap-target checkbox-animation text-[var(--text-muted)]/40 hover:text-primary transition-colors cursor-pointer shrink-0"
+        className="tap-target-sm checkbox-animation text-[var(--text-muted)]/40 hover:text-primary transition-colors cursor-pointer shrink-0"
         aria-label={isCompletedVisual ? 'Als offen markieren' : 'Als erledigt markieren'}
       >
         {isCompletedVisual ? (
@@ -137,7 +138,7 @@ const ActiveChecklistRow = memo(function ActiveChecklistRow({
       {/* Delete cross */}
       <button
         onClick={() => onDelete(item.id)}
-        className="tap-target opacity-100 md:opacity-0 md:group-hover:opacity-100 text-[var(--text-muted)] hover:text-red-500 active:scale-90 transition-all cursor-pointer shrink-0"
+        className="tap-target-sm opacity-100 md:opacity-0 md:group-hover:opacity-100 text-[var(--text-muted)] hover:text-red-500 active:scale-90 transition-all cursor-pointer shrink-0"
         title="Eintrag entfernen"
         aria-label="Eintrag entfernen"
       >
@@ -255,7 +256,7 @@ const ActiveChecklistList = memo(function ActiveChecklistList({
   }, []);
 
   return (
-    <Reorder.Group axis="y" values={ordered} onReorder={handleReorder} className="space-y-1">
+    <Reorder.Group axis="y" values={ordered} onReorder={handleReorder} className="space-y-0.5">
       {ordered.map((item) => (
         <ActiveChecklistRow
           key={item.id}
@@ -806,6 +807,7 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
 
   const colorStyles = getNoteColorStyles(color);
   const iconClass = colorStyles.icon;
+  const canShare = isOwnedByMe(note);
 
   return (
     <div
@@ -884,7 +886,7 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
         />
 
         {/* Quick Add Row */}
-        <div className="flex items-center gap-3 py-2 border-t border-[var(--border-color)] mt-1">
+        <div className="flex items-center gap-3 py-1 border-t border-[var(--border-color)] mt-1">
           <div className="w-5 h-5 flex items-center justify-center text-[var(--text-muted)]/30 shrink-0">
             <Plus className="w-4.5 h-4.5" />
           </div>
@@ -913,7 +915,7 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
               <span className="h-[1px] flex-1 bg-[var(--border-color)]"></span>
             </h4>
 
-            <div className="space-y-1 opacity-70">
+            <div className="space-y-0.5 opacity-70">
               <AnimatePresence initial={false}>
                 {completedItems.map((item) => {
                   const isCompletedVisual = visualCompletion(item);
@@ -926,11 +928,11 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.95 }}
-                      className="flex items-center gap-3 py-1.5 group"
+                      className="flex items-center gap-3 group"
                     >
                       <button
                         onClick={() => handleToggleItem(item.id, item.is_completed)}
-                        className={`tap-target checkbox-animation transition-colors cursor-pointer shrink-0 ${colorStyles.icon}`}
+                        className={`tap-target-sm checkbox-animation transition-colors cursor-pointer shrink-0 ${colorStyles.icon}`}
                         aria-label={isCompletedVisual ? 'Als offen markieren' : 'Als erledigt markieren'}
                       >
                         {isCompletedVisual ? (
@@ -959,7 +961,7 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
 
                       <button
                         onClick={() => handleDeleteItem(item.id)}
-                        className="tap-target opacity-100 md:opacity-0 md:group-hover:opacity-100 text-[var(--text-muted)] hover:text-red-500 active:scale-90 transition-all cursor-pointer"
+                        className="tap-target-sm opacity-100 md:opacity-0 md:group-hover:opacity-100 text-[var(--text-muted)] hover:text-red-500 active:scale-90 transition-all cursor-pointer"
                         title="Eintrag löschen"
                         aria-label="Eintrag löschen"
                       >
@@ -1036,8 +1038,11 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
 
           <button
             onClick={() => setIsShared(!isShared)}
-            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-colors cursor-pointer ${isShared ? 'bg-primary/10 text-primary' : 'text-[var(--text-secondary)] hover:bg-[var(--background)]/80'}`}
-            title={isShared ? 'Nicht mehr teilen' : 'Mit Partner teilen'}
+            disabled={!canShare}
+            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${isShared ? 'bg-primary/10 text-primary' : 'text-[var(--text-secondary)] hover:bg-[var(--background)]/80'}`}
+            title={canShare
+              ? (isShared ? 'Nicht mehr teilen' : 'Mit Partner teilen')
+              : 'Nur wer die Liste angelegt hat, kann das Teilen beenden'}
           >
             <Users size={19} />
           </button>

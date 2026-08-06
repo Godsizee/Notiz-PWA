@@ -7,6 +7,7 @@ import { RecordModel } from 'pocketbase';
 import { Pin, PinOff, Archive, ArchiveRestore, Trash2, Check, Users, UserMinus, Copy } from 'lucide-react';
 import { NOTE_COLORS } from '@/lib/colors';
 import { hapticLight } from '@/lib/haptics';
+import { isOwnedByMe } from '@/lib/pb';
 
 interface ContextMenuProps {
   isOpen: boolean;
@@ -113,7 +114,9 @@ export default function ContextMenu({
 
             <button
               onClick={() => run(onToggleShare)}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--background)]/80 transition-colors cursor-pointer text-left"
+              disabled={!isOwnedByMe(note)}
+              title={isOwnedByMe(note) ? undefined : 'Nur wer die Notiz angelegt hat, kann das Teilen beenden'}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--background)]/80 transition-colors cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
             >
               {note.is_shared ? (
                 <><UserMinus className="w-4 h-4 text-primary" /> Nicht mehr teilen</>

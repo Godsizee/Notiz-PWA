@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { RecordModel } from 'pocketbase';
-import { pb } from '@/lib/pb';
+import { pb, isOwnedByMe } from '@/lib/pb';
 import { Palette, Pin, Archive, Trash2, Check, ExternalLink, RefreshCw, Users, ImagePlus, Camera, Images, ClipboardPaste } from 'lucide-react';
 import { getNoteColorStyles, NOTE_COLORS } from '@/lib/colors';
 import { applyChange, newRecordId } from '@/lib/sync';
@@ -325,6 +325,7 @@ export default function NoteEditor({ note, imagesByNote, onClose, onRequestDelet
 
   const extractedLinks = getExtractedLinks(content);
   const colorStyles = getNoteColorStyles(color);
+  const canShare = isOwnedByMe(note);
 
   const imageMenuItem =
     'w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--background)]/80 transition-colors cursor-pointer text-left whitespace-nowrap';
@@ -548,8 +549,11 @@ export default function NoteEditor({ note, imagesByNote, onClose, onRequestDelet
           {/* Share Button */}
           <button
             onClick={() => setIsShared(!isShared)}
-            className={`shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-colors cursor-pointer ${isShared ? 'bg-primary/10 text-primary' : 'text-[var(--text-secondary)] hover:bg-[var(--background)]/80'}`}
-            title={isShared ? 'Nicht mehr teilen' : 'Mit Partner teilen'}
+            disabled={!canShare}
+            className={`shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${isShared ? 'bg-primary/10 text-primary' : 'text-[var(--text-secondary)] hover:bg-[var(--background)]/80'}`}
+            title={canShare
+              ? (isShared ? 'Nicht mehr teilen' : 'Mit Partner teilen')
+              : 'Nur wer die Notiz angelegt hat, kann das Teilen beenden'}
           >
             <Users size={19} />
           </button>
