@@ -75,10 +75,13 @@ const ActiveChecklistRow = memo(function ActiveChecklistRow({
       whileDrag={{ scale: 1.02 }}
       className={`flex items-center gap-2 group py-1.5 bg-transparent rounded-xl ${isDragging ? 'shadow-[0_10px_30px_-12px_rgba(0,0,0,0.35)]' : ''}`}
     >
-      {/* Drag handle */}
+      {/* Drag handle. The hit area is 32x44 rather than the icon's 16x16: the
+          checkbox and delete buttons next to it already claim 44px, and a
+          grip you have to hit within 20px is one every second touch misses —
+          landing on the row instead, which just scrolls. */}
       <button
         onPointerDown={(e) => controls.start(e)}
-        className="touch-none cursor-grab active:cursor-grabbing text-[var(--text-muted)]/30 hover:text-[var(--text-muted)] transition-colors shrink-0 p-0.5"
+        className="drag-handle w-8 min-h-11 flex items-center justify-center cursor-grab active:cursor-grabbing text-[var(--text-muted)]/30 hover:text-[var(--text-muted)] transition-colors shrink-0 -ml-1"
         title="Zum Sortieren ziehen"
         aria-label="Eintrag verschieben"
       >

@@ -365,9 +365,30 @@ textarea {
   justify-content: center;
 }
 
-/* Remove the ~300ms double-tap-to-zoom delay on interactive elements. */
-button, a, input, textarea, select, [role="button"] {
-  touch-action: manipulation;
+/* Remove the ~300ms double-tap-to-zoom delay on interactive elements.
+ *
+ * This MUST stay inside @layer base. Unlayered rules outdo every layered one
+ * regardless of specificity, so an unlayered version of this silently beats
+ * Tailwind's `touch-*` utilities (they live in @layer utilities) — which broke
+ * every gesture surface that is a <button>: the checklist drag handle stopped
+ * being draggable on touch because the browser kept `pan-y` and scrolled the
+ * list instead, and the FAB's long-press went with it. Mouse input ignores
+ * touch-action, which is why it only ever showed up on phones. */
+@layer base {
+  button, a, input, textarea, select, [role="button"] {
+    touch-action: manipulation;
+  }
+}
+
+/* Gesture surfaces that own their pointer outright: no browser panning, no
+   long-press callout, no text selection while dragging. Bundled into one
+   class so a drag handle can never again be one cascade change away from
+   being dead on touch. */
+.drag-handle {
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 input, textarea {
