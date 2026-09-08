@@ -55,8 +55,8 @@ angelegten Konto `needs_password_change` auf `true` — die App zwingt beim erst
 Login dann zum Passwortwechsel.
 
 Alternativ läuft die Registrierung über `/api/register`, aber nur für Adressen,
-die in der Allowlist in [`src/app/api/register/route.ts`](src/app/api/register/route.ts)
-stehen.
+die in `REGISTRATION_ALLOWED_EMAILS` stehen. Ist die Variable leer oder nicht
+gesetzt, ist die Registrierung geschlossen.
 
 ### 3. App starten
 
@@ -82,7 +82,12 @@ Alle Variablen sind in [`.env.example`](.env.example) dokumentiert.
 | `POCKETBASE_URL` | Laufzeit (Server) | Dieselbe Instanz, **wie der Server sie erreicht** — im Docker-Netz der Servicename statt `localhost`. |
 | `NEXT_PUBLIC_SITE_URL` | Build | Öffentliche Basis-URL, gebraucht für den Redirect des Android-Share-Targets. |
 | `PB_SUPERUSER_EMAIL` / `PB_SUPERUSER_PASSWORD` | PocketBase-Start | Admin-Konto, das beim ersten Start des Containers angelegt wird. |
+| `REGISTRATION_ALLOWED_EMAILS` | Laufzeit (Server) | Kommagetrennte Allowlist für `/api/register`. Leer = Registrierung geschlossen. |
+| `PB_INITIAL_USER_EMAILS` / `PB_INITIAL_USER_PASSWORD` | PocketBase-Start | Optional: Startkonten mit erzwungenem Passwortwechsel. |
 
+> `NEXT_PUBLIC_POCKETBASE_URL` ist **Pflicht** — fehlt sie, bricht der Build mit
+> einer Meldung ab, statt still auf eine fremde Instanz zu zeigen.
+>
 > Die `NEXT_PUBLIC_*`-Werte werden **zur Buildzeit** ins Bundle eingebacken. Im
 > Docker-Build müssen sie deshalb als `--build-arg` ankommen, nicht als
 > Laufzeit-Environment. Der Workflow in
@@ -109,6 +114,29 @@ zusammen mit PocketBase.
 Damit der Build die richtige Backend-URL einbackt, müssen im Repository unter
 *Settings → Secrets and variables → Actions → Variables* die Variablen
 `NEXT_PUBLIC_POCKETBASE_URL` und `NEXT_PUBLIC_SITE_URL` gesetzt sein.
+
+## Sicherheit
+
+- **Geschlossene Registrierung:** `/api/register` prüft gegen
+  `REGISTRATION_ALLOWED_EMAILS` und ist bei leerer Liste zu. Dazu ein
+  IP-Rate-Limit von 5 Versuchen pro 15 Minuten (im Prozessspeicher, also pro
+  Container — für einen Einzel-Container-Betrieb ausreichend).
+- **Zugriffsregeln:** Notizen sind für den Besitzer sichtbar und für alle, wenn
+  `is_shared` gesetzt ist. Geteilte Notizen darf jeder Beteiligte bearbeiten,
+  aber **nur der Besitzer** darf sie löschen, den Besitz übertragen oder das
+  Teilen beenden (siehe
+  [`pb_migrations/1778867200_tighten_note_rules.js`](pb_migrations/1778867200_tighten_note_rules.js)).
+- **Sicherheitsheader:** CSP, `nosniff`, `Referrer-Policy`, `X-Frame-Options`,
+  `Permissions-Policy` und HSTS werden in
+  [`next.config.mjs`](next.config.mjs) gesetzt.
+- **Keine Zugangsdaten im Repo:** Alle Secrets kommen aus der Umgebung. Es gibt
+  bewusst keine Fallback-Werte, die auf eine konkrete Instanz zeigen.
+
+Bekannte Einschränkungen: `script-src` in der CSP erlaubt `'unsafe-inline'`
+(das Theme-Skript muss vor dem ersten Paint laufen; ein strenges `script-src`
+bräuchte Nonces und damit dynamisches Rendering auf allen Seiten), und die
+Registrierung verifiziert die E-Mail-Adresse nicht — dafür müsste in PocketBase
+SMTP konfiguriert sein.
 
 ## Lizenz
 
