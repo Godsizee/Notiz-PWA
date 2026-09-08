@@ -151,9 +151,14 @@ export default function ContextMenu({
 
             <div className="h-[1px] bg-[var(--border-color)] my-1 mx-2" />
 
+            {/* Loeschen ist Sache des Besitzers — serverseitig durchgesetzt in
+                pb_migrations/1778867200_tighten_note_rules.js. Ohne diese
+                Sperre liefe der Klick in ein stilles 403 in der Sync-Queue. */}
             <button
               onClick={() => run(onDelete)}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-red-500 hover:bg-red-500/5 transition-colors cursor-pointer text-left"
+              disabled={!isOwnedByMe(note)}
+              title={isOwnedByMe(note) ? undefined : 'Nur wer die Notiz angelegt hat, kann sie löschen'}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-red-500 hover:bg-red-500/5 transition-colors cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
             >
               <Trash2 className="w-4 h-4" /> Löschen
             </button>
