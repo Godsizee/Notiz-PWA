@@ -1,5 +1,7 @@
-version: "3.8"
-
+# Werte kommen aus .env (cp .env.example .env). Die :?-Syntax laesst
+# `docker compose up` mit der genannten Meldung abbrechen, wenn eine Variable
+# fehlt — vorher standen hier echte Zugangsdaten als Default im Klartext, in
+# einem oeffentlichen Repository.
 services:
   notiz-app:
     image: ghcr.io/godsizee/notiz-pwa:master
@@ -7,10 +9,12 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_POCKETBASE_URL=${NEXT_PUBLIC_POCKETBASE_URL:-https://pbnote.dasdann.jetzt}
+      - NEXT_PUBLIC_POCKETBASE_URL=${NEXT_PUBLIC_POCKETBASE_URL:?in .env setzen, siehe .env.example}
+      - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL:?in .env setzen, siehe .env.example}
       - POCKETBASE_URL=${POCKETBASE_URL:-http://pocketbase:8090}
-      - PB_SUPERUSER_EMAIL=${PB_SUPERUSER_EMAIL:-badesebastian@outlook.com}
-      - PB_SUPERUSER_PASSWORD=${PB_SUPERUSER_PASSWORD:-Arschmusik11}
+      # Kommagetrennte Allowlist fuer /api/register. Leer oder nicht gesetzt =
+      # Registrierung zu; Konten legt man dann im PocketBase-Admin an.
+      - REGISTRATION_ALLOWED_EMAILS=${REGISTRATION_ALLOWED_EMAILS:-}
     depends_on:
       - pocketbase
     restart: always
@@ -22,8 +26,8 @@ services:
     ports:
       - "8090:8090"
     environment:
-      - PB_SUPERUSER_EMAIL=badesebastian@outlook.com
-      - PB_SUPERUSER_PASSWORD=Arschmusik11
+      - PB_SUPERUSER_EMAIL=${PB_SUPERUSER_EMAIL:?in .env setzen, siehe .env.example}
+      - PB_SUPERUSER_PASSWORD=${PB_SUPERUSER_PASSWORD:?in .env setzen, siehe .env.example}
     volumes:
       - pb_data:/pb_data
       - pb_public:/pb_public

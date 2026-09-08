@@ -6,13 +6,6 @@ import { pb } from "@/lib/pb";
 import { motion, AnimatePresence } from "framer-motion";
 import { Mail, Lock, AlertCircle, ArrowRight, CheckCircle } from "lucide-react";
 
-const ALLOWED_EMAILS = [
-  "badesebastian@outlook.com",
-  "claudiaborg@web.de",
-  "eztokk@gmail.com",
-  "annaklatsche83@gmail.com",
-];
-
 type Mode = "login" | "register";
 
 export default function LoginPage() {
@@ -65,12 +58,6 @@ export default function LoginPage() {
     setIsLoading(true);
 
     const normalizedEmail = email.trim().toLowerCase();
-
-    if (!ALLOWED_EMAILS.includes(normalizedEmail)) {
-      setError("Diese E-Mail-Adresse ist nicht für die Registrierung zugelassen.");
-      setIsLoading(false);
-      return;
-    }
 
     if (password !== confirmPassword) {
       setError("Passwörter stimmen nicht überein.");

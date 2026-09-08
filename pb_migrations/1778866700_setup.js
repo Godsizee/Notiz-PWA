@@ -61,40 +61,62 @@ migrate((app) => {
     app.save(checklistItems);
   } catch (e) { /* ignore if exists */ }
 
-  // 4. Create initial users (PWA Users)
-  const emails = ["badesebastian@outlook.com", "claudiaborg@web.de"];
-  emails.forEach(email => {
-    try {
-      let user;
-      try {
-        user = app.findFirstRecordByData("users", "email", email);
-      } catch (e) {
-        user = new Record(usersCollection);
-        user.set("email", email);
-      }
-      user.setPassword("ChangeMe123!");
-      user.set("needs_password_change", true);
-      app.save(user);
-    } catch (e) { /* ignore or log */ }
-  });
+  // 4. Optional: Startkonten anlegen.
+  //
+  // Hier standen die privaten E-Mail-Adressen zweier realer Personen und das
+  // ein gemeinsames Initialpasswort im Klartext — in einem oeffentlichen Repo.
+  // Beides kommt jetzt aus der Umgebung, und ohne diese Variablen passiert
+  // schlicht nichts. Der dokumentierte Weg ist das PocketBase-Admin-UI
+  // (siehe README), das hier ist nur die Bequemlichkeit fuer einen frischen
+  // Container.
+  const initialEmails = ($os.getenv("PB_INITIAL_USER_EMAILS") || "")
+    .split(",")
+    .map((entry) => entry.trim().toLowerCase())
+    .filter((entry) => entry.length > 0);
+  const initialPassword = $os.getenv("PB_INITIAL_USER_PASSWORD") || "";
 
-  // 5. Create or Update Superuser (PB v0.23+ API)
-  try {
-    const adminEmail = "admin@notiz.local";
-    const adminPassword = "AdminPassword123!";
-    
-    let superuser;
+  if (initialEmails.length > 0 && initialPassword.length >= 8) {
+    initialEmails.forEach((email) => {
+      try {
+        let user;
+        try {
+          user = app.findFirstRecordByData("users", "email", email);
+        } catch (e) {
+          user = new Record(usersCollection);
+          user.set("email", email);
+        }
+        user.setPassword(initialPassword);
+        // Erzwingt den Passwortwechsel beim ersten Login.
+        user.set("needs_password_change", true);
+        app.save(user);
+      } catch (e) { /* ignore or log */ }
+    });
+  }
+
+  // 5. Superuser anlegen.
+  //
+  // Frueher fest verdrahtet auf admin@notiz.local mit festem Passwort — ein
+  // bekanntes Admin-Konto auf jeder Instanz, die diese Migration je ausgefuehrt
+  // hat. Jetzt nur noch aus der Umgebung; fehlt sie, legt das PocketBase-Image
+  // den Superuser selbst aus PB_SUPERUSER_* an.
+  const adminEmail = $os.getenv("PB_SUPERUSER_EMAIL") || "";
+  const adminPassword = $os.getenv("PB_SUPERUSER_PASSWORD") || "";
+
+  if (adminEmail.length > 0 && adminPassword.length >= 8) {
     try {
-      superuser = app.findSuperuserByEmail(adminEmail);
+      let superuser;
+      try {
+        superuser = app.findSuperuserByEmail(adminEmail);
+      } catch (e) {
+        superuser = new Superuser();
+        superuser.email = adminEmail;
+      }
+
+      superuser.setPassword(adminPassword);
+      app.save(superuser);
     } catch (e) {
-      superuser = new Superuser();
-      superuser.email = adminEmail;
+      // ignore
     }
-    
-    superuser.setPassword(adminPassword);
-    app.save(superuser);
-  } catch (e) {
-    // ignore
   }
 
 }, (app) => {

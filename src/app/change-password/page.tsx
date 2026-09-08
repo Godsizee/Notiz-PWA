@@ -123,7 +123,7 @@ export default function ChangePasswordPage() {
                   className="w-full pl-11 pr-4 py-3 bg-[var(--background)]/50 border border-[var(--border-color)] rounded-2xl focus:ring-2 focus:ring-primary focus:border-transparent focus:outline-none text-[var(--text-primary)] placeholder-•••••••• text-base"
                   value={oldPassword}
                   onChange={(e) => setOldPassword(e.target.value)}
-                  placeholder="z.B. ChangeMe123!"
+                  placeholder="Aktuelles Passwort"
                 />
               </div>
             </div>
