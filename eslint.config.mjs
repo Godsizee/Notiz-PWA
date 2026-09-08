@@ -19,13 +19,15 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
-    // Generated service worker files:
+    // Generated service worker files (next-pwa/workbox emit these on every
+    // build; they are gitignored and not our source):
     "public/sw.js",
     "public/workbox-*.js",
-    // PocketBase migration scripts (not TypeScript source):
+    "public/swe-worker-*.js",
+    "public/worker-*.js",
+    "public/fallback-*.js",
+    // PocketBase migration scripts (JSVM globals, not TypeScript source):
     "pb_migrations/**",
-    // Legacy seeding script (superseded by pb_migrations):
-    "seed.js",
   ]),
 ]);
 

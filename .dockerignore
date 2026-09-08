@@ -1,22 +1,44 @@
+# Abhaengigkeiten & Build-Artefakte (werden im Image neu erzeugt)
 node_modules
 .next
+out
+build
+coverage
+
+# VCS & CI
 .git
+.gitignore
 .github
+
+# Editoren & OS
 .idea
 .vscode
+.DS_Store
+Thumbs.db
+
+# Logs
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.env*.local
-.env.development
-.env.test
-.DS_Store
+
+# Secrets — duerfen unter keinen Umstaenden in eine Image-Layer
+.env
+.env.*
+!.env.example
+
+# Docker & lokale PocketBase-Daten
 Dockerfile
+Dockerfile.pocketbase
 .dockerignore
-pb_data
-seed.js
 docker-compose.yml
+pb_data
+pb_public
+
+# Doku & AI-Kontext
 README.md
 CLAUDE.md
 AGENTS.md
+SCOPE.md
+.agents
+.claude

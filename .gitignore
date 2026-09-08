@@ -16,6 +16,7 @@
 # next.js
 /.next/
 /out/
+/build
 
 # next-pwa generated service worker (rebuilt on every `next build`)
 /public/sw.js
@@ -24,32 +25,37 @@
 /public/worker-*.js
 /public/fallback-*.js
 
-# production
-/build
-
-# misc
-.DS_Store
-*.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-
-# env files (can opt-in for committing if needed)
+# env files — .env.example ist die dokumentierte Vorlage und gehoert ins Repo
 .env*
+!.env.example
 
-# vercel
-.vercel
+# secrets / certificates
+*.pem
+*.key
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
 
-# pocketbase
+# pocketbase (lokale Instanz: Datenbank, Uploads, generierte Typen)
 pb_data/
 pb_public/
+
+# logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# editors & OS
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# deployment
+.vercel
 
 # Model / AI context & custom plans
 .agents/
@@ -57,6 +63,3 @@ pb_public/
 AGENTS.md
 CLAUDE.md
 SCOPE.md
-
-# Build-Reste
-tsconfig.tsbuildinfo
