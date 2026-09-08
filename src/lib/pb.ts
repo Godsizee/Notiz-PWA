@@ -1,7 +1,16 @@
 import PocketBase, { RecordModel } from 'pocketbase';
 import { metaSet, metaDelete } from '@/lib/offlineDb';
 
-const pbUrl = process.env.NEXT_PUBLIC_POCKETBASE_URL || 'https://pbnote.dasdann.jetzt';
+// Kein Fallback auf eine konkrete Instanz: der fruehere Default zeigte auf den
+// Produktionsserver des Autors. next.config.mjs bricht den Build ohne diese
+// Variable bereits ab, das hier ist nur die zweite Absicherung.
+const pbUrl = process.env.NEXT_PUBLIC_POCKETBASE_URL;
+
+if (!pbUrl) {
+  throw new Error(
+    'NEXT_PUBLIC_POCKETBASE_URL ist nicht gesetzt — siehe .env.example.'
+  );
+}
 
 export const pb = new PocketBase(pbUrl);
 

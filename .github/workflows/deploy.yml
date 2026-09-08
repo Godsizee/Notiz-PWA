@@ -54,6 +54,20 @@ jobs:
       # Kein separater 'npm run build' mehr: das Dockerfile baut die App
       # ohnehin in seiner builder-Stage. Der vorgelagerte Build wurde komplett
       # verworfen und hat nur Laufzeit gekostet.
+      # Der Build bricht ohne diese Variable ab (next.config.mjs) — frueher
+      # zeigte ein Default still auf eine fremde PocketBase-Instanz. Lieber
+      # hier mit klarer Ansage scheitern als in einem Webpack-Stacktrace.
+      - name: Preflight — Repository Variables gesetzt?
+        run: |
+          if [ -z "${{ vars.NEXT_PUBLIC_POCKETBASE_URL }}" ]; then
+            echo "::error::NEXT_PUBLIC_POCKETBASE_URL fehlt. Setzen unter Settings -> Secrets and variables -> Actions -> Variables."
+            exit 1
+          fi
+          if [ -z "${{ vars.NEXT_PUBLIC_SITE_URL }}" ]; then
+            echo "::error::NEXT_PUBLIC_SITE_URL fehlt. Setzen unter Settings -> Secrets and variables -> Actions -> Variables."
+            exit 1
+          fi
+
       - name: Log in to the Container registry
         uses: docker/login-action@v3
         with:
