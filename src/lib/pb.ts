@@ -7,7 +7,7 @@ export const pb = new PocketBase(pbUrl);
 
 // Synchronize client-side auth store with the cookie if we are in the browser
 if (typeof window !== 'undefined') {
-  // 1. Initial Load: Load cookie token & model into AuthStore if present to match middleware state
+  // 1. Initial Load: Load cookie token & model into AuthStore if present to match proxy (src/proxy.ts) state
   const pbAuthCookie = document.cookie
     .split('; ')
     .find(row => row.startsWith('pb_auth='));

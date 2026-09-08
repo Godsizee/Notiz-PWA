@@ -16,7 +16,10 @@ function tokenNotExpired(token: string): boolean {
   }
 }
 
-export function middleware(request: NextRequest) {
+// Heisst 'proxy' statt 'middleware': Next 16 hat die middleware-Konvention
+// deprecated und erwartet Datei und Export unter diesem Namen. Verhalten und
+// Signatur sind unveraendert.
+export function proxy(request: NextRequest) {
   const pbAuthCookie = request.cookies.get('pb_auth')?.value;
 
   let authStoreModel = null;
@@ -60,14 +63,19 @@ export function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Match all request paths except for:
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - manifest.json (pwa manifest)
-     * - sw.js, workbox-*.js (PWA service workers)
+     * Match all request paths except:
+     * - api/    (route handlers do their own auth against PocketBase)
+     * - _next/  (build output: static chunks, image optimizer)
+     * - anything with a static file extension
+     *
+     * Der Datei-Endungs-Ausschluss ist nicht kosmetisch: ohne ihn lief JEDE
+     * Anfrage aus /public durch die Weiterleitung oben. Ausgeloggt kam damit
+     * fuer /logo.png ein 307 auf /login zurueck — das Logo auf der Login-Seite
+     * selbst blieb kaputt, und die im Manifest referenzierten Install-Icons
+     * (/icon-192x192.png, /icon-512x512.png) waren vor dem Login nicht
+     * ladbar. Das sind oeffentliche Markenassets ohne Nutzerdaten; welche
+     * SEITEN Auth brauchen, aendert sich dadurch nicht.
      */
-    '/((?!api|_next/static|_next/image|favicon.ico|manifest.json|sw.js|workbox-).*)',
+    '/((?!api/|_next/|.*\.(?:ico|png|jpg|jpeg|gif|svg|webp|avif|json|js|txt|xml|woff2?)$).*)',
   ],
 };

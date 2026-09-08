@@ -78,7 +78,18 @@ export default function Header({ searchQuery = "", onSearchChange }: HeaderProps
             whileTap={{ scale: 0.95 }}
             className="w-10 h-10 shrink-0 rounded-xl overflow-hidden shadow-[var(--shadow-card)]"
           >
-            <img src="/logo.png" alt="B&B Notes Logo" className="w-full h-full object-cover" />
+            {/* next/image lohnt sich hier nicht: statisches 40px-Logo (7 KB), und der
+                standalone-Runner bringt kein sharp mit, wuerde also ohnehin unoptimiert
+                ausliefern. width/height verhindern den Layout-Shift. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo.png"
+              alt="B&B Notes Logo"
+              width={40}
+              height={40}
+              decoding="async"
+              className="w-full h-full object-cover"
+            />
           </motion.div>
           <div className="min-w-0">
             <h1 className="text-lg font-extrabold tracking-tight brand-text truncate">

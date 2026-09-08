@@ -127,7 +127,18 @@ export default function LoginPage() {
             whileTap={{ scale: 0.95 }}
             className="w-14 h-14 rounded-2xl overflow-hidden mb-4 shadow-[var(--shadow-elevated)]"
           >
-            <img src="/logo.png" alt="B&B Notes Logo" className="w-full h-full object-cover" />
+            {/* next/image lohnt sich hier nicht: statisches 56px-Logo (7 KB), und der
+                standalone-Runner bringt kein sharp mit, wuerde also ohnehin unoptimiert
+                ausliefern. width/height verhindern den Layout-Shift. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo.png"
+              alt="B&B Notes Logo"
+              width={56}
+              height={56}
+              decoding="async"
+              className="w-full h-full object-cover"
+            />
           </motion.div>
           <h1 className="text-3xl font-extrabold text-center tracking-tight text-[var(--text-primary)]">
             B&amp;B Notes
