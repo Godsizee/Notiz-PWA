@@ -13,6 +13,7 @@ import { hapticLight, hapticHeavy } from '@/lib/haptics';
 import { parseQuantity } from '@/lib/quantities';
 import { useToastStore } from '@/store/useToastStore';
 import { useEscapeKey } from '@/lib/useEscapeKey';
+import { splitPastedItems } from '@/lib/checklistPaste';
 import ConfettiBurst from '@/components/ui/ConfettiBurst';
 import ScanSheet from '@/components/notes/ScanSheet';
 import { NoteTopBar, NoteBottomBar, BarButton } from '@/components/notes/NoteBars';
@@ -558,6 +559,34 @@ export default function ChecklistEditor({ note, onClose, onCreated, onArchived, 
     } catch (err) {
       console.error("Failed to add checklist item:", err);
       notifyError("Eintrag konnte nicht hinzugefügt werden.");
+    }
+  };
+
+  // Mehrere Zeilen eingefuegt → je Zeile ein Eintrag, "[x]" abgehakt.
+  const handlePasteItems = async (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const parsed = splitPastedItems(e.clipboardData.getData('text/plain'));
+    if (!parsed) return; // eine Zeile: normales Einfuegen ins Feld
+    e.preventDefault();
+    const noteId = await ensureNoteExists();
+    const start = nextOrder();
+    const records = await Promise.all(
+      parsed.map((p, i) =>
+        applyChange({
+          collection: 'checklist_items',
+          action: 'create',
+          id: newRecordId(),
+          data: { note: noteId, text: p.text, is_completed: p.done, order: start + i },
+        }).catch(() => null)
+      )
+    );
+    const created = records.filter((r): r is RecordModel => !!r);
+    setItems((prev) =>
+      [...prev, ...created.filter((r) => !prev.some((p) => p.id === r.id))].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+    );
+    if (created.length < parsed.length) notifyError(`${parsed.length - created.length} Einträge konnten nicht eingefügt werden.`);
+    if (created.length > 0) {
+      hapticLight();
+      showToast({ message: `${created.length} ${created.length === 1 ? 'Eintrag' : 'Einträge'} eingefügt`, duration: 3000 });
     }
   };
 
@@ -1221,6 +1250,7 @@ export default function ChecklistEditor({ note, onClose, onCreated, onArchived, 
             className="flex-1 bg-transparent border-none outline-none text-base md:text-lg text-[var(--text-primary)] placeholder-[var(--text-muted)]/40 py-1"
             value={newItemText}
             onChange={(e) => setNewItemText(e.target.value)}
+            onPaste={handlePasteItems}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault();
