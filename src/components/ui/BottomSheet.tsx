@@ -18,13 +18,28 @@ interface BottomSheetProps {
    * screen) the card morphs into the sheet instead of it sliding up.
    */
   layoutId?: string;
+  /** Accessible name of the dialog, e.g. "Liste bearbeiten". */
+  label?: string;
   children: React.ReactNode;
 }
 
-export default function BottomSheet({ isOpen, onClose, layoutId, children }: BottomSheetProps) {
+export default function BottomSheet({ isOpen, onClose, layoutId, label, children }: BottomSheetProps) {
   const [height, setHeight] = useState(0);
   const drag = useRef({ active: false, startY: 0, startH: 0 });
   const sheetRef = useRef<HTMLDivElement>(null);
+
+  // Nach dem Schliessen steht der Fokus wieder auf dem Element, das das Sheet
+  // geoeffnet hat (Karte oder Knopf) — sonst landet er auf <body>, und wer mit
+  // Tastatur oder Screenreader arbeitet, beginnt oben von vorn.
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (isOpen) {
+      returnFocusRef.current = document.activeElement as HTMLElement | null;
+      return;
+    }
+    returnFocusRef.current?.focus?.();
+    returnFocusRef.current = null;
+  }, [isOpen]);
 
   // Set default height synchronously before the first paint to avoid flash.
   useLayoutEffect(() => {
@@ -104,6 +119,9 @@ export default function BottomSheet({ isOpen, onClose, layoutId, children }: Bot
           {/* Sheet — morphs from the note card when layoutId is set */}
           <motion.div
             ref={sheetRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={label}
             layoutId={layoutId}
             initial={layoutId ? false : { y: '100%' }}
             animate={layoutId ? undefined : { y: 0 }}
@@ -118,6 +136,8 @@ export default function BottomSheet({ isOpen, onClose, layoutId, children }: Bot
               onPointerMove={onPointerMove}
               onPointerUp={onPointerUp}
               onPointerCancel={onPointerUp}
+              role="separator"
+              aria-label="Zum Schließen nach unten ziehen"
               className="w-full flex justify-center pt-1 pb-3 -mt-1 cursor-grab active:cursor-grabbing touch-none select-none"
             >
               <div className="w-12 h-1.5 bg-(--text-muted)/40 rounded-full transition-colors" />

@@ -459,6 +459,7 @@ export default function Home() {
         isOpen={isSheetOpen}
         onClose={closeSheet}
         layoutId={activeNote ? `note-${activeNote.id}` : undefined}
+        label={editorType === "checklist" ? "Liste bearbeiten" : "Notiz bearbeiten"}
       >
         {editorType === "checklist" ? (
           <ChecklistEditor

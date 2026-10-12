@@ -88,9 +88,11 @@ export default function ContextMenu({
             exit={{ opacity: 0, scale: 0.9, y: -6 }}
             transition={{ type: 'spring', damping: 24, stiffness: 360 }}
             style={{ left, top, width: MENU_WIDTH }}
+            role="menu"
             className="fixed z-[91] bg-[var(--card-bg)] border border-[var(--border-color)] shadow-2xl rounded-2xl p-2 origin-top-left"
           >
             <button
+              role="menuitem"
               onClick={() => run(onTogglePin)}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--background)]/80 transition-colors cursor-pointer text-left"
             >
@@ -102,6 +104,7 @@ export default function ContextMenu({
             </button>
 
             <button
+              role="menuitem"
               onClick={() => run(onToggleArchive)}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--background)]/80 transition-colors cursor-pointer text-left"
             >
@@ -113,6 +116,7 @@ export default function ContextMenu({
             </button>
 
             <button
+              role="menuitem"
               onClick={() => run(onToggleShare)}
               disabled={!isOwnedByMe(note)}
               title={isOwnedByMe(note) ? undefined : 'Nur wer die Notiz angelegt hat, kann das Teilen beenden'}
@@ -126,6 +130,7 @@ export default function ContextMenu({
             </button>
 
             <button
+              role="menuitem"
               onClick={() => run(onDuplicate)}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--background)]/80 transition-colors cursor-pointer text-left"
             >
@@ -136,6 +141,7 @@ export default function ContextMenu({
             <div className="flex items-center gap-1.5 px-3 py-2.5 flex-wrap">
               {NOTE_COLORS.map((c) => (
                 <button
+              role="menuitem"
                   key={c.id}
                   onClick={() => run(() => onChangeColor(c.hex))}
                   className="w-6 h-6 rounded-full border border-black/10 shadow-inner flex items-center justify-center transition-transform hover:scale-110 cursor-pointer"
@@ -155,6 +161,7 @@ export default function ContextMenu({
                 pb_migrations/1778867200_tighten_note_rules.js. Ohne diese
                 Sperre liefe der Klick in ein stilles 403 in der Sync-Queue. */}
             <button
+              role="menuitem"
               onClick={() => run(onDelete)}
               disabled={!isOwnedByMe(note)}
               title={isOwnedByMe(note) ? undefined : 'Nur wer die Notiz angelegt hat, kann sie löschen'}

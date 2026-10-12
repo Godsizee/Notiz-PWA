@@ -144,6 +144,16 @@ export default function NoteCard({
         onPointerMove={handlePointerMove}
         onPointerUp={clearLongPress}
         onClick={handleClick}
+        role="button"
+        tabIndex={0}
+        aria-label={note.title || (note.type === 'checklist' ? 'Unbenannte Liste' : 'Unbenannte Notiz')}
+        onKeyDown={(e) => {
+          if (e.target !== e.currentTarget) return;
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onClick();
+          }
+        }}
         onContextMenu={(e) => {
           e.preventDefault();
           setMenuPos({ x: e.clientX, y: e.clientY });
