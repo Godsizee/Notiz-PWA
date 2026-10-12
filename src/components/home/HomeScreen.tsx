@@ -25,7 +25,7 @@ import Toast from "@/components/ui/Toast";
 import NoteEditor from "@/components/notes/NoteEditor";
 import ChecklistEditor from "@/components/notes/ChecklistEditor";
 import { Layout, SearchX } from "lucide-react";
-import Header from "@/components/ui/Header";
+import HomeTopBar from "@/components/home/HomeTopBar";
 import { motion } from "framer-motion";
 import { useNoteRoute } from "@/lib/useNoteRoute";
 import { adoptCreatedId, resolveSession, type SessionState } from "@/lib/noteRoute";
@@ -379,8 +379,11 @@ export default function HomeScreen() {
       </Masonry>
     );
 
+  // main nutzt overflow-clip statt -hidden: schneidet die Glow-Flaechen ab, macht
+  // main aber nicht zum Scroll-Container — sonst haftet die sticky Suchleiste
+  // nicht am Fenster.
   return (
-    <main className="min-h-screen bg-[var(--background)] pb-28 relative overflow-hidden transition-colors duration-300">
+    <main className="min-h-screen bg-[var(--background)] pb-28 relative overflow-clip transition-colors duration-300">
       {/* Uebersicht bleibt gemountet (Scrollposition, Realtime), ist aber bei
           offener Vollbild-Notiz fuer Tastatur und Screenreader gesperrt. */}
       <div inert={isNoteOpen && !isWide}>
@@ -388,9 +391,9 @@ export default function HomeScreen() {
       <div className="absolute top-[-30%] right-[-10%] w-[600px] h-[600px] rounded-full blur-[140px] pointer-events-none" style={{ background: "var(--glow-a)" }} />
       <div className="absolute bottom-[-10%] left-[-20%] w-[600px] h-[600px] rounded-full blur-[140px] pointer-events-none" style={{ background: "var(--glow-b)" }} />
 
-      <Header searchQuery={searchQuery} onSearchChange={setSearchQuery} />
+      <HomeTopBar searchQuery={searchQuery} onSearchChange={setSearchQuery} />
 
-      <div className="max-w-4xl mx-auto px-4 md:px-6 relative z-10 animate-fade-in-up">
+      <div className="max-w-4xl mx-auto px-4 md:px-6 mt-2 relative z-10 animate-fade-in-up">
         {/* Filter bar (only once notes exist; hidden while searching) */}
         {!isLoading && hasAnyNotes && !searchTerm && (
           <div className="mb-6">

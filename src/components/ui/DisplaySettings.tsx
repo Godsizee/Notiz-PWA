@@ -107,10 +107,10 @@ export default function DisplaySettings({ userEmail, onLogout }: DisplaySettings
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={() => setOpen((v) => !v)}
-        className={`w-11 h-11 rounded-xl border shadow-sm flex items-center justify-center transition-all cursor-pointer ${
+        className={`tap-target rounded-full border transition-colors cursor-pointer ${
           open
             ? "bg-primary/10 border-primary/30 text-primary"
-            : "bg-[var(--card-bg)] border-[var(--border-color)] text-[var(--text-secondary)] hover:shadow-md"
+            : "border-transparent text-[var(--text-secondary)] hover:bg-[var(--text-primary)]/5"
         }`}
         title="Menü"
         aria-label="Menü"
