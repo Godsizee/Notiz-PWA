@@ -28,6 +28,13 @@
   --color-pastel-pink: #ffadad;
   --color-pastel-purple: #bdb2ff;
   --color-pastel-orange: #ffd166;
+
+  /* Bewegung (Material 3 "standard"/"emphasized", gerundet) */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasized: cubic-bezier(0.3, 0, 0, 1);
+  --duration-short: 150ms;
+  --duration-medium: 250ms;
+  --duration-long: 400ms;
 }
 
 /* ------------------------------------------------------------------ */
@@ -444,3 +451,7 @@ input, textarea {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Vollbild-Notiz offen (NoteScreen variant="overlay"): die Seite darunter
+   nicht mitscrollen. Scrollposition bleibt erhalten. */
+html.note-open, html.note-open body { overflow: hidden; }

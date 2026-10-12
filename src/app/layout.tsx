@@ -38,6 +38,10 @@ export const viewport: Viewport = {
   // so the status bar follows the active theme and the opened note's color.
   width: "device-width",
   initialScale: 1,
+  // Chrome/Android verkleinert mit der Tastatur den Layout-Viewport, statt sie
+  // ueber die Seite zu legen — so bleiben sticky Leisten (NoteBottomBar) sichtbar.
+  // iOS ignoriert das; dort hilft useKeyboardInset.
+  interactiveWidget: "resizes-content",
   // Kein maximumScale/userScalable mehr: eine Zoomsperre verstoesst gegen
   // WCAG 1.4.4. Eingabefelder haben mind. 16 px, damit iOS beim Fokussieren
   // nicht von selbst zoomt; Doppeltipp-Zoom auf Knoepfen verhindert bereits
