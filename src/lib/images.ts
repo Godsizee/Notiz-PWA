@@ -206,3 +206,44 @@ export async function processImages(
   }
   return { processed, failed };
 }
+
+/**
+ * Longest edge for the photo scan. Claude Haiku 5.5 reads images in the
+ * high-resolution tier (up to 4784 visual tokens of 28x28 px). A 4:3 photo at
+ * 2048 px is 74 x 55 = 4070 tokens, so it arrives unscaled; going larger only
+ * gets downsampled again server-side and costs upload time. Small print in a
+ * cookbook is where the extra resolution over 1568 px pays off.
+ */
+const SCAN_MAX_EDGE = 2048;
+/** Below this the model starts guessing at handwriting. */
+const SCAN_MIN_EDGE = 400;
+
+/**
+ * Prepare a photo for the shopping-list scan (src/lib/scan/client.ts).
+ *
+ * Unlike processImage() this always re-encodes as JPEG: Safari's canvas
+ * silently returns PNG when asked for WebP on older versions, and a 1568-px
+ * PNG of a handwritten note is several MB. Quality 0.88 keeps pencil strokes
+ * readable — heavier compression is exactly what makes handwriting illegible.
+ */
+export async function prepareScanImage(file: File | Blob): Promise<Blob> {
+  if (file.size > MAX_INPUT_BYTES) {
+    throw new ImageTooLargeError('Bild ist größer als 25 MB.');
+  }
+
+  const source = await decode(file);
+  const width = Number(source.width);
+  const height = Number(source.height);
+  if (!width || !height) {
+    throw new ImageDecodeError('Bild hat keine lesbaren Abmessungen.');
+  }
+  if (Math.max(width, height) < SCAN_MIN_EDGE) {
+    if ('close' in source && typeof source.close === 'function') source.close();
+    throw new ImageDecodeError('Das Foto ist zu klein, um Text darauf zu lesen.');
+  }
+
+  const target = scaledSize(width, height, SCAN_MAX_EDGE);
+  const blob = await encode(drawTo(source, target.width, target.height), 'image/jpeg', 0.88);
+  if ('close' in source && typeof source.close === 'function') source.close();
+  return blob;
+}
