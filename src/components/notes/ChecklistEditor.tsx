@@ -14,6 +14,9 @@ import { parseQuantity } from '@/lib/quantities';
 import { useToastStore } from '@/store/useToastStore';
 import { useEscapeKey } from '@/lib/useEscapeKey';
 import { splitPastedItems } from '@/lib/checklistPaste';
+import { rankSuggestions } from '@/lib/suggestions';
+import { useItemHistory } from '@/lib/useItemHistory';
+import { itemKey } from '@/lib/scan/merge';
 import ConfettiBurst from '@/components/ui/ConfettiBurst';
 import ScanSheet from '@/components/notes/ScanSheet';
 import { NoteTopBar, NoteBottomBar, BarButton } from '@/components/notes/NoteBars';
@@ -302,6 +305,8 @@ export default function ChecklistEditor({ note, onClose, onCreated, onArchived, 
   const [lastSavedAt, setLastSavedAt] = useState('');
   const [activeNoteId, setActiveNoteId] = useState<string | undefined>(note?.id);
   const [newItemText, setNewItemText] = useState('');
+  const [composerFocused, setComposerFocused] = useState(false);
+  const composerBlurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
 
@@ -534,8 +539,8 @@ export default function ChecklistEditor({ note, onClose, onCreated, onArchived, 
 
   const nextOrder = () => items.reduce((max, i) => Math.max(max, i.order ?? 0), -1) + 1;
 
-  const handleAddItem = async () => {
-    if (!newItemText.trim()) return;
+  const handleAddItemText = async (text: string) => {
+    if (!text.trim()) return;
     const noteId = await ensureNoteExists();
 
     try {
@@ -545,7 +550,7 @@ export default function ChecklistEditor({ note, onClose, onCreated, onArchived, 
         id: newRecordId(),
         data: {
           note: noteId,
-          text: newItemText,
+          text,
           is_completed: false,
           order: nextOrder(),
         },
@@ -561,6 +566,20 @@ export default function ChecklistEditor({ note, onClose, onCreated, onArchived, 
       notifyError("Eintrag konnte nicht hinzugefügt werden.");
     }
   };
+  const handleAddItem = () => handleAddItemText(newItemText);
+
+  // Fokus der Eingabezeile steuert die Vorschlaege. Blur verzoegert, damit ein
+  // Tipp auf einen Vorschlag noch ankommt.
+  const handleComposerFocus = () => {
+    if (composerBlurTimer.current) clearTimeout(composerBlurTimer.current);
+    setComposerFocused(true);
+  };
+  const handleComposerBlur = () => {
+    composerBlurTimer.current = setTimeout(() => setComposerFocused(false), 150);
+  };
+  useEffect(() => () => {
+    if (composerBlurTimer.current) clearTimeout(composerBlurTimer.current);
+  }, []);
 
   // Mehrere Zeilen eingefuegt → je Zeile ein Eintrag, "[x]" abgehakt.
   const handlePasteItems = async (e: React.ClipboardEvent<HTMLInputElement>) => {
@@ -985,6 +1004,14 @@ export default function ChecklistEditor({ note, onClose, onCreated, onArchived, 
   }, [items, pendingDeleteItemIds, togglingItems]);
   useEffect(() => { activeItemsRef.current = activeItems; }, [activeItems]);
 
+  // Vorschlaege aus allem, was je in einer Liste stand (ohne das, was hier schon offen ist).
+  const itemHistory = useItemHistory(composerFocused);
+  const openKeys = useMemo(() => new Set(activeItems.map((i) => itemKey(String(i.text ?? '')))), [activeItems]);
+  const suggestions = useMemo(
+    () => rankSuggestions(newItemText, itemHistory, openKeys),
+    [newItemText, itemHistory, openKeys]
+  );
+
   const colorStyles = getNoteColorStyles(color);
   const iconClass = colorStyles.icon;
   const canShare = isOwnedByMe(note);
@@ -1251,6 +1278,8 @@ export default function ChecklistEditor({ note, onClose, onCreated, onArchived, 
             value={newItemText}
             onChange={(e) => setNewItemText(e.target.value)}
             onPaste={handlePasteItems}
+            onFocus={handleComposerFocus}
+            onBlur={handleComposerBlur}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault();
@@ -1268,6 +1297,23 @@ export default function ChecklistEditor({ note, onClose, onCreated, onArchived, 
             <ScanText className="w-5 h-5" />
           </button>
         </div>
+        {composerFocused && suggestions.length > 0 && (
+          <div className="flex flex-wrap gap-2 py-1.5 pl-8" role="listbox" aria-label="Vorschläge">
+            {suggestions.map((s) => (
+              <button
+                key={s}
+                role="option"
+                aria-selected={false}
+                onMouseDown={(e) => e.preventDefault() /* Fokus im Feld halten */}
+                onClick={() => { setNewItemText(s); void handleAddItemText(s); }}
+                className="min-h-9 rounded-full border border-[var(--border-color)] px-3 text-sm text-[var(--text-secondary)] hover:bg-[var(--primary-light)] cursor-pointer"
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
+
         <AnimatePresence initial={false}>
           {showScanMenu && (
             <motion.div
