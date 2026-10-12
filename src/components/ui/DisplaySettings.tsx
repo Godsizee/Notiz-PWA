@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { SlidersHorizontal, LayoutGrid, List, FileJson, FileText, Download, Sun, Moon, MoonStar, LogOut } from "lucide-react";
-import { usePreferencesStore, type FontSize, type ViewMode } from "@/store/usePreferencesStore";
+import { usePreferencesStore, type FontSize, type SortMode, type ViewMode } from "@/store/usePreferencesStore";
 import { exportNotes, type ExportFormat } from "@/lib/exportNotes";
 import { useToastStore } from "@/store/useToastStore";
 import { hapticLight } from "@/lib/haptics";
@@ -18,6 +18,11 @@ const FONT_OPTIONS: { id: FontSize; label: string }[] = [
 const VIEW_OPTIONS: { id: ViewMode; label: string; Icon: typeof LayoutGrid }[] = [
   { id: "grid", label: "Raster", Icon: LayoutGrid },
   { id: "list", label: "Liste", Icon: List },
+];
+
+const SORT_OPTIONS: { id: SortMode; label: string }[] = [
+  { id: "server", label: "Standard" },
+  { id: "title", label: "Titel A–Z" },
 ];
 
 const THEME_OPTIONS: { id: Theme; label: string; Icon: typeof Sun }[] = [
@@ -78,8 +83,10 @@ export default function DisplaySettings({ userEmail, onLogout }: DisplaySettings
   const [isExporting, setIsExporting] = useState(false);
   const viewMode = usePreferencesStore((s) => s.viewMode);
   const fontSize = usePreferencesStore((s) => s.fontSize);
+  const sortMode = usePreferencesStore((s) => s.sortMode);
   const setViewMode = usePreferencesStore((s) => s.setViewMode);
   const setFontSize = usePreferencesStore((s) => s.setFontSize);
+  const setSortMode = usePreferencesStore((s) => s.setSortMode);
   const showToast = useToastStore((s) => s.showToast);
 
   const handleExport = async (format: ExportFormat) => {
@@ -182,6 +189,34 @@ export default function DisplaySettings({ userEmail, onLogout }: DisplaySettings
                       }`}
                     >
                       <Icon className="w-4 h-4" />
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Sortierung (Datumssortierung braeuchte created/updated in der Datenbank) */}
+              <p className="text-[11px] font-extrabold text-[var(--text-muted)] tracking-widest uppercase mb-2 mt-3 pl-1">
+                Sortieren
+              </p>
+              <div className="flex gap-1.5" role="radiogroup" aria-label="Sortieren">
+                {SORT_OPTIONS.map(({ id, label }) => {
+                  const active = sortMode === id;
+                  return (
+                    <button
+                      key={id}
+                      role="radio"
+                      aria-checked={active}
+                      onClick={() => {
+                        hapticLight();
+                        setSortMode(id);
+                      }}
+                      className={`flex-1 flex min-h-10 items-center justify-center rounded-xl text-xs font-bold transition-colors cursor-pointer border ${
+                        active
+                          ? "bg-primary-strong text-white border-transparent"
+                          : "text-[var(--text-secondary)] border-[var(--border-color)] hover:text-[var(--text-primary)]"
+                      }`}
+                    >
                       {label}
                     </button>
                   );

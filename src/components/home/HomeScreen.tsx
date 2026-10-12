@@ -64,6 +64,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const showToast = useToastStore((s) => s.showToast);
   const viewMode = usePreferencesStore((s) => s.viewMode);
+  const sortMode = usePreferencesStore((s) => s.sortMode);
 
   // Welche Notiz offen ist, steht in der URL (/?note=<id>, /?new=text|checklist),
   // siehe src/lib/noteRoute.ts. Daraus wird die Editor-Sitzung abgeleitet.
@@ -489,10 +490,14 @@ export default function HomeScreen() {
       if (n.type === "checklist") return (checklistIndex[n.id] || "").includes(searchTerm);
       return false;
     })
+    // Angepinnte zuerst. Die Sortierung nach Datum gibt es nicht: notes hat kein
+    // created/updated (der frueher hier stehende Vergleich ergab immer NaN), also
+    // bleibt bei "Standard" die Reihenfolge der Datenbank (Array.sort ist stabil).
     .sort((a, b) => {
       if (a.is_pinned && !b.is_pinned) return -1;
       if (!a.is_pinned && b.is_pinned) return 1;
-      return new Date(b.created).getTime() - new Date(a.created).getTime();
+      if (sortMode === "title") return String(a.title || "").localeCompare(String(b.title || ""), "de");
+      return 0;
     });
 
   const pinnedNotes = filteredNotes.filter((n) => n.is_pinned);
