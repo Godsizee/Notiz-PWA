@@ -5,7 +5,7 @@ import { create } from 'zustand';
 import { RecordModel } from 'pocketbase';
 import { pb } from '@/lib/pb';
 import { onLocalChange, isAbortError } from '@/lib/sync';
-import { cacheGetAll } from '@/lib/offlineDb';
+import { cacheGetAll, cacheReplaceAllItems } from '@/lib/offlineDb';
 import { useSyncStore } from '@/store/useSyncStore';
 import { applyEvent, byOrder } from '@/lib/useRealtime';
 
@@ -73,6 +73,8 @@ export function useChecklistPreviewSync() {
       try {
         const records = await pb.collection('checklist_items').getFullList({ sort: 'order', requestKey: 'preview_items' });
         if (!cancelled) replaceAll(records);
+        // Auch ohne Abbruch sichern: der Snapshot gehoert dem Geraet, nicht diesem Effekt.
+        cacheReplaceAllItems(records).catch(() => {});
       } catch (err) {
         const e = err as { status?: number; isAbort?: boolean } | null;
         if (e && e.status === 0 && !e.isAbort) {

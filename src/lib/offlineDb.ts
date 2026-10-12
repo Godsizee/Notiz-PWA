@@ -172,6 +172,21 @@ export function cacheReplaceItems(noteId: string, records: CachedRecord[]): Prom
 }
 
 /**
+ * Replace the full checklist_items snapshot. The overview loads the items of
+ * ALL lists at once (useChecklistPreview), so — like the images — the refresh is
+ * collection-wide. Without it the offline overview showed "Leere Checkliste" for
+ * every list whose editor had not been opened on this device.
+ */
+export async function cacheReplaceAllItems(records: CachedRecord[]): Promise<void> {
+  const db = await openDb();
+  const tx = db.transaction('checklist_items', 'readwrite');
+  const store = tx.objectStore('checklist_items');
+  store.clear();
+  records.forEach((r) => store.put(r));
+  return txDone(tx);
+}
+
+/**
  * Replace the full note_images snapshot. Unlike checklist items these are
  * loaded once for the whole overview (see useRealtimeImages), so the refresh
  * is collection-wide rather than per note. Records still pending upload keep
