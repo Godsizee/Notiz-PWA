@@ -27,6 +27,14 @@ const PB_ORIGIN = new URL(process.env.NEXT_PUBLIC_POCKETBASE_URL as string).orig
 
 const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,
+  // /?note=<id>, /?new=…, /?select=1 sind Zustaende derselben Seite "/" —
+  // beim Precache-Abgleich ignorieren, sonst waere jeder Reload in einer
+  // offenen Notiz offline ein Fehlschlag. cleanupOutdatedCaches raeumt alte
+  // Precache-Revisionen nach Updates weg.
+  precacheOptions: {
+    cleanupOutdatedCaches: true,
+    ignoreURLParametersMatching: [/^note$/, /^new$/, /^select$/, /^utm_/, /^fbclid$/],
+  },
   skipWaiting: true,
   clientsClaim: true,
   navigationPreload: true,

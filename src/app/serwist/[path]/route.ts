@@ -8,7 +8,13 @@ const revision =
   spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf-8' }).stdout?.trim() || crypto.randomUUID();
 
 export const { dynamic, dynamicParams, revalidate, generateStaticParams, GET } = createSerwistRoute({
-  additionalPrecacheEntries: [{ url: '/~offline', revision }],
+  // "/" precachen: Navigationen haben keinen Content-Type-Request-Header und
+  // fallen sonst in Serwists "others"-Cache mit 24 h Ablauf — nach einem Tag
+  // ohne Netz startete die installierte App nicht mehr (Plan UI-Overhaul B.6 #2).
+  additionalPrecacheEntries: [
+    { url: '/', revision },
+    { url: '/~offline', revision },
+  ],
   swSrc: 'src/app/sw.ts',
   useNativeEsbuild: true,
   esbuildOptions: {
