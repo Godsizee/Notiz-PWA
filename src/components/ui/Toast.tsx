@@ -12,6 +12,7 @@ import { useToastStore } from '@/store/useToastStore';
 export default function Toast() {
   const toast = useToastStore((s) => s.toast);
   const dismiss = useToastStore((s) => s.dismiss);
+  const offset = useToastStore((s) => s.offset);
 
   useEffect(() => {
     if (!toast) return;
@@ -30,7 +31,9 @@ export default function Toast() {
           transition={{ type: 'spring', damping: 26, stiffness: 320 }}
           role="status"
           aria-live="polite"
-          className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[70] w-[calc(100%-2rem)] max-w-sm"
+          className={`fixed left-1/2 -translate-x-1/2 z-[70] w-[calc(100%-2rem)] max-w-sm ${
+            offset === 'bar' ? 'bottom-[calc(4.5rem+env(safe-area-inset-bottom))]' : 'bottom-[calc(5.5rem+env(safe-area-inset-bottom))]'
+          }`}
         >
           <div className="flex items-center gap-3 bg-[var(--card-bg)]/95 backdrop-blur-xl border border-[var(--border-color)] shadow-2xl rounded-2xl px-4 py-3">
             <span

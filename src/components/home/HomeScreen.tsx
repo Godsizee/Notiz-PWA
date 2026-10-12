@@ -25,7 +25,7 @@ import PullToRefresh from "@/components/ui/PullToRefresh";
 import Toast from "@/components/ui/Toast";
 import NoteEditor from "@/components/notes/NoteEditor";
 import ChecklistEditor from "@/components/notes/ChecklistEditor";
-import { Layout, SearchX } from "lucide-react";
+import { Layout, SearchX, ListTodo, FileText, Users, Archive } from "lucide-react";
 import HomeTopBar from "@/components/home/HomeTopBar";
 import SelectionBar from "@/components/home/SelectionBar";
 import { useSelectionActive, useSelectionStore } from "@/store/useSelectionStore";
@@ -33,9 +33,18 @@ import { useSelectionHistory } from "@/lib/useSelectionHistory";
 import { motion } from "framer-motion";
 import { useNoteRoute } from "@/lib/useNoteRoute";
 import { adoptCreatedId, resolveSession, type SessionState } from "@/lib/noteRoute";
-import { useMediaQuery } from "@/lib/useViewport";
+import { useMediaQuery, useScrollDirection } from "@/lib/useViewport";
 
 const UNDO_DELETE_MS = 5000;
+
+// Leerzustand je Filter: Symbol, Titel und ein Hinweis, was man tun kann.
+const EMPTY_STATES: Record<NoteFilter, { Icon: typeof Layout; title: string; text: string }> = {
+  all: { Icon: Layout, title: "Noch nichts hier", text: "Tippe auf + für eine Liste – halte es gedrückt für eine Textnotiz." },
+  checklist: { Icon: ListTodo, title: "Keine Listen", text: "Tippe auf +, um eine Liste anzulegen." },
+  text: { Icon: FileText, title: "Keine Textnotizen", text: "Halte + gedrückt, um eine Textnotiz anzulegen." },
+  shared: { Icon: Users, title: "Noch nichts geteilt", text: "Öffne eine Notiz und tippe oben auf „Mit Partner teilen“." },
+  archived: { Icon: Archive, title: "Archiv ist leer", text: "Wische eine Karte nach links, um sie zu archivieren." },
+};
 
 // Masonry-Schluessel sind Max-Breiten: bis 359 px eine Spalte, ab 360 px zwei,
 // ab 769 px drei.
@@ -63,6 +72,8 @@ export default function HomeScreen() {
   const sessionSeq = useRef(0);
   // Ab 1024 px Liste und Notiz nebeneinander statt Vollbild-Overlay (U40).
   const isWide = useMediaQuery("(min-width: 1024px)");
+  // Beim Runterscrollen schrumpft der Plus-Knopf auf das Symbol.
+  const fabCompact = useScrollDirection() === "down";
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   const [activeFilter, setActiveFilter] = useState<NoteFilter>("all");
@@ -119,6 +130,12 @@ export default function HomeScreen() {
 
   const session = sessionState.status === "open" ? sessionState.session : null;
   const isNoteOpen = sessionState.status === "open" || sessionState.status === "loading";
+
+  // Snackbar ueber der unteren Leiste der Notiz statt ueber dem Plus-Knopf.
+  const setToastOffset = useToastStore((s) => s.setOffset);
+  useEffect(() => {
+    setToastOffset(isNoteOpen ? "bar" : "fab");
+  }, [isNoteOpen, setToastOffset]);
 
   // Statusleiste in der Farbe der offenen Notiz, sonst in der des Themes.
   useEffect(() => {
@@ -587,49 +604,45 @@ export default function HomeScreen() {
                 </div>
               )}
             </div>
-          ) : hasAnyNotes ? (
-            /* Filter returned nothing */
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="flex flex-col items-center justify-center py-20 text-center px-4"
-            >
-              <div className="w-20 h-20 bg-[var(--card-bg)] rounded-3xl flex items-center justify-center text-[var(--text-muted)] mb-6 border border-[var(--border-color)]">
-                <SearchX className="w-10 h-10" />
-              </div>
-              <h3 className="text-xl font-bold text-[var(--text-primary)]">
-                Keine Treffer
-              </h3>
-              <p className="text-sm text-[var(--text-secondary)] mt-2 max-w-sm leading-relaxed">
-                {searchTerm
-                  ? `Nichts zu „${searchQuery.trim()}" gefunden – weder in Titeln, Inhalten noch Checklisten.`
-                  : "Für diesen Filter gibt es keine Notizen. Passe den Filter an oder erstelle etwas Neues."}
-              </p>
-            </motion.div>
           ) : (
-            /* Empty State */
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.2 }}
-              className="flex flex-col items-center justify-center py-20 text-center px-4"
-            >
-              <div className="w-20 h-20 bg-primary/10 rounded-3xl flex items-center justify-center text-primary mb-6 border border-primary/15 shadow-inner">
-                <Layout className="w-10 h-10" />
-              </div>
-              <h3 className="text-xl font-bold text-[var(--text-primary)]">
-                Keine Notizen oder Checklisten
-              </h3>
-              <p className="text-sm text-[var(--text-secondary)] mt-2 max-w-sm leading-relaxed">
-                Tippe auf das Plus für eine neue Liste – halte es gedrückt für eine Textnotiz.
-              </p>
-            </motion.div>
+            /* Nichts zu zeigen: Suche ohne Treffer, Farbfilter oder ein leerer Filter */
+            (() => {
+              const noMatch = !!searchTerm || (hasAnyNotes && !!activeColor);
+              const empty = EMPTY_STATES[activeFilter];
+              const Icon = noMatch ? SearchX : empty.Icon;
+              return (
+                <motion.div
+                  key={noMatch ? "no-match" : activeFilter}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="flex flex-col items-center justify-center py-20 text-center px-4"
+                >
+                  <div className={`w-20 h-20 rounded-3xl flex items-center justify-center mb-6 border ${
+                    noMatch
+                      ? "bg-[var(--card-bg)] text-[var(--text-muted)] border-[var(--border-color)]"
+                      : "bg-primary/10 text-primary border-primary/15 shadow-inner"
+                  }`}>
+                    <Icon className="w-10 h-10" />
+                  </div>
+                  <h3 className="text-xl font-bold text-[var(--text-primary)]">
+                    {noMatch ? "Keine Treffer" : empty.title}
+                  </h3>
+                  <p className="text-sm text-[var(--text-secondary)] mt-2 max-w-sm leading-relaxed">
+                    {searchTerm
+                      ? `Nichts zu „${searchQuery.trim()}" gefunden – weder in Titeln, Inhalten noch Checklisten.`
+                      : noMatch
+                        ? "Für diese Farbe gibt es keine Notizen. Passe den Filter an."
+                        : empty.text}
+                  </p>
+                </motion.div>
+              );
+            })()
           )}
         </PullToRefresh>
       </div>
 
       {/* FAB: tap = checklist, long-press = type picker */}
-      {!selecting && <FAB onCreateText={openText} onCreateChecklist={openChecklist} />}
+      {!selecting && <FAB onCreateText={openText} onCreateChecklist={openChecklist} compact={fabCompact} />}
       </div>
 
       {/* Geoeffnete Notiz als eigenes Vollbild (Telefon) bzw. rechte Spalte (ab 1024 px).

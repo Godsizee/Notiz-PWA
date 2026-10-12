@@ -10,11 +10,13 @@ interface FABProps {
   onCreateText: () => void;
   /** Single-tap: create a checklist (the common case). */
   onCreateChecklist: () => void;
+  /** Beim Runterscrollen nur das Plus zeigen, beim Hochscrollen mit Beschriftung. */
+  compact?: boolean;
 }
 
 const LONG_PRESS_MS = 300;
 
-export default function FAB({ onCreateText, onCreateChecklist }: FABProps) {
+export default function FAB({ onCreateText, onCreateChecklist, compact = false }: FABProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressedRef = useRef(false);
@@ -114,12 +116,22 @@ export default function FAB({ onCreateText, onCreateChecklist }: FABProps) {
           onPointerLeave={handlePointerLeave}
           onContextMenu={(e) => e.preventDefault()}
           style={{ backgroundImage: "var(--fab-gradient)" }}
-          className="w-14 h-14 text-white rounded-2xl shadow-[var(--shadow-elevated)] flex items-center justify-center hover:scale-110 active:scale-95 transition-transform duration-200 border border-white/15 select-none touch-none ring-1 ring-black/5"
+          className="h-14 min-w-14 px-3 text-white rounded-2xl shadow-[var(--shadow-elevated)] flex items-center justify-center hover:scale-110 active:scale-95 transition-transform duration-200 border border-white/15 select-none touch-none ring-1 ring-black/5"
           aria-label="Neue Liste – gedrückt halten für eine Textnotiz"
         >
           <motion.span animate={{ rotate: menuOpen ? 45 : 0 }} transition={{ duration: 0.2 }}>
             <Plus size={32} strokeWidth={2.5} />
           </motion.span>
+          {/* Beschriftung klappt per max-width ein; reine CSS-Transition, damit sie
+              nicht mit dem Skalieren des Knopfes um die Wette animiert. */}
+          <span
+            aria-hidden="true"
+            className={`overflow-hidden whitespace-nowrap text-base font-bold transition-[max-width,opacity,margin] duration-[var(--duration-medium)] ease-[var(--ease-standard)] ${
+              compact || menuOpen ? 'ml-0 max-w-0 opacity-0' : 'ml-1.5 max-w-24 opacity-100'
+            }`}
+          >
+            Liste
+          </span>
         </button>
       </div>
     </>
