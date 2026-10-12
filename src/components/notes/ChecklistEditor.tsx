@@ -1037,7 +1037,7 @@ export default function ChecklistEditor({ note, onClose, onCreated, onArchived, 
     const startOrder = itemsRef.current.reduce((max, i) => Math.max(max, i.order ?? 0), -1) + 1;
     const textById = new Map(itemsRef.current.map((i) => [i.id, String(i.text ?? '')]));
     const commit = await commitScanRows(noteId, rows, startOrder, textById);
-    const done = commit.createdIds.length + commit.reopened.length;
+    const done = commit.createdIds.length + commit.reopened.length + commit.increased.length;
 
     if (done === 0) {
       showToast({ message: 'Die Einträge konnten nicht gespeichert werden.', tone: 'danger', duration: 4000 });
@@ -1056,7 +1056,8 @@ export default function ChecklistEditor({ note, onClose, onCreated, onArchived, 
     showToast({
       message: commit.failed > 0
         ? `${done} übernommen, ${commit.failed} fehlgeschlagen`
-        : `${done} ${done === 1 ? 'Eintrag' : 'Einträge'} übernommen`,
+        : `${done} ${done === 1 ? 'Eintrag' : 'Einträge'} übernommen` +
+          (commit.increased.length > 0 ? ` (${commit.increased.length} Menge ergänzt)` : ''),
       tone: commit.failed > 0 ? 'danger' : 'default',
       actionLabel: 'Rückgängig',
       duration: UNDO_DELETE_MS,

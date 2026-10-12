@@ -7,7 +7,7 @@ import { AlertTriangle, CheckCircle2, Circle, Camera, RotateCcw, X, Loader2 } fr
 import type { RecordModel } from 'pocketbase';
 import { prepareScanImage } from '@/lib/images';
 import { requestScan, ScanError } from '@/lib/scan/client';
-import { planMerge, type MergeRow, type MergeReason } from '@/lib/scan/merge';
+import { existingForScan, planMerge, type MergeRow, type MergeReason } from '@/lib/scan/merge';
 import type { ScanResult } from '@/lib/scan/result';
 import { hapticLight } from '@/lib/haptics';
 
@@ -46,9 +46,10 @@ const SLOW_AFTER_MS = 8000;
 const NOT_RETRYABLE = new Set(['decode_failed', 'invalid_input', 'too_large', 'unauthenticated', 'llm_refused']);
 
 const REASON_LABEL: Record<MergeReason, string> = {
-  duplicate_open: 'Steht schon auf der Liste',
+  duplicate_open: 'Steht schon auf der Liste (Menge nicht addierbar)',
   duplicate_scan: 'Doppelt im Foto',
   reopen_completed: 'Wird wieder aktiviert',
+  increase_quantity: 'Menge wird ergänzt',
   low_confidence: 'Unsicher gelesen – bitte prüfen',
 };
 
@@ -56,6 +57,7 @@ const REASON_CLASS: Record<MergeReason, string> = {
   duplicate_open: 'bg-[var(--text-primary)]/5 text-[var(--text-secondary)]',
   duplicate_scan: 'bg-[var(--text-primary)]/5 text-[var(--text-secondary)]',
   reopen_completed: 'bg-primary/10 text-primary',
+  increase_quantity: 'bg-primary/10 text-primary',
   low_confidence: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
 };
 
@@ -84,14 +86,22 @@ export default function ScanSheet({ files, existingItems, onClose, onCommit, onR
     }, SLOW_AFTER_MS);
 
     try {
-      const result = await requestScan(blobs, controller.signal);
+      const toExisting = () =>
+        existingRef.current.map((i) => ({ id: i.id, text: String(i.text ?? ''), is_completed: !!i.is_completed }));
+      // Die Liste im Moment der Anfrage: ihre Reihenfolge ist der Schluessel fuer
+      // "match" in der Antwort (Nummer des gleichbedeutenden Listeneintrags).
+      const sent = existingForScan(toExisting());
+      const result = await requestScan(
+        blobs,
+        sent.map((e) => ({ text: e.text, done: e.is_completed })),
+        controller.signal
+      );
       if (controller.signal.aborted) return;
-      const existing = existingRef.current.map((i) => ({
-        id: i.id,
-        text: String(i.text ?? ''),
-        is_completed: !!i.is_completed,
-      }));
-      setRows(planMerge(result.items, existing, result.sourceType));
+      const items = result.items.map((it) =>
+        it.match && it.match > 0 ? { ...it, matchId: sent[it.match - 1]?.id } : it
+      );
+      // Geplant wird gegen die Liste von jetzt (ein Partner kann waehrenddessen etwas geaendert haben).
+      setRows(planMerge(items, toExisting(), result.sourceType));
       setPhase({ kind: 'review', result });
       hapticLight();
     } catch (err) {
@@ -250,7 +260,7 @@ export default function ScanSheet({ files, existingItems, onClose, onCommit, onR
                   <p className="max-w-xs text-sm text-[var(--text-secondary)]">
                     {phase.kind === 'scanning' && phase.slow
                       ? 'Dauert etwas länger als sonst. Du kannst abbrechen und es gleich noch einmal versuchen.'
-                      : 'Einkaufszettel werden 1:1 übernommen, Rezepte in Einkaufsmengen umgerechnet.'}
+                      : 'Einkaufszettel werden 1:1 übernommen, Rezepte in Einkaufsmengen umgerechnet. Steht ein Artikel schon auf der Liste, wird seine Menge ergänzt.'}
                   </p>
                 </div>
               )}
@@ -327,6 +337,9 @@ export default function ScanSheet({ files, existingItems, onClose, onCommit, onR
                             />
                             {row.item.raw && row.item.raw !== row.text && (
                               <p className="truncate text-xs text-[var(--text-muted)]">Gelesen: {row.item.raw}</p>
+                            )}
+                            {row.action === 'increase' && row.previousText && (
+                              <p className="truncate text-xs text-[var(--text-muted)]">Bisher: {row.previousText}</p>
                             )}
                             {row.reason && (
                               <span className={`mt-1 inline-block rounded-md px-1.5 py-0.5 text-xs font-semibold ${REASON_CLASS[row.reason]}`}>

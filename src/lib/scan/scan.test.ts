@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseQuantity } from '@/lib/quantities';
-import { formatItemText, itemKey, itemText, planMerge, sameItem } from '@/lib/scan/merge';
+import { existingForScan, formatItemText, itemKey, itemText, planMerge, productKey, sameItem, sameProduct } from '@/lib/scan/merge';
 import { parseScanResult, type ScanItem } from '@/lib/scan/result';
 
 const item = (patch: Partial<ScanItem>): ScanItem => ({
@@ -53,7 +53,7 @@ describe('itemKey / sameItem', () => {
 });
 
 describe('planMerge', () => {
-  it('proposes add / skip / reopen against the current list', () => {
+  it('proposes add / increase / reopen against the current list', () => {
     const rows = planMerge(
       [
         item({ name: 'Mehl', count: 1, unit: 'Packung' }),
@@ -72,11 +72,11 @@ describe('planMerge', () => {
 
     expect(rows.map((r) => [r.text, r.action, r.selected, r.reason ?? null, r.targetId ?? null])).toEqual([
       ['1 Packung Mehl', 'add', true, null, null],
-      ['2 Zwiebeln', 'add', false, 'duplicate_open', null],
+      ['3 Zwiebeln', 'increase', true, 'increase_quantity', 'a'],
       ['Backpulver', 'reopen', true, 'reopen_completed', 'b'],
       ['1 Packung Mehl', 'add', false, 'duplicate_scan', null],
       ['Zimtstangen', 'add', true, 'low_confidence', null],
-      ['6 Eier', 'add', false, 'duplicate_open', null],
+      ['16 Eier', 'increase', true, 'increase_quantity', 'c'],
     ]);
   });
 
@@ -161,5 +161,146 @@ describe('Einkaufszettel 1:1, Rezepte umgerechnet', () => {
       ['4 Milch', false, 'duplicate_scan'],
       ['2-3 Bananen', false, 'duplicate_open'],
     ]);
+  });
+});
+
+describe('productKey / sameProduct', () => {
+  it('entfernt Mengenreste, die parseQuantity nicht kennt', () => {
+    expect(productKey('2-3 Bananen')).toBe('bananen');
+    expect(productKey('18er Eier')).toBe('eier');
+    expect(productKey('2 Packungen Mehl')).toBe('mehl');
+  });
+
+  it('erkennt Schreibvarianten desselben Produkts', () => {
+    expect(sameProduct(productKey('Pommes'), productKey('Pommes frites'))).toBe(true);
+    expect(sameProduct(productKey('Milch'), productKey('H-Milch'))).toBe(true);
+    expect(sameProduct(productKey('Zwiebel'), productKey('Zwiebeln'))).toBe(true);
+    expect(sameProduct(productKey('Eier'), productKey('18er Eier'))).toBe(true);
+  });
+
+  it('haelt aehnlich klingende Produkte auseinander', () => {
+    expect(sameProduct('milch', 'milchreis')).toBe(false);
+    expect(sameProduct('apfel', 'apfelsaft')).toBe(false);
+    // ein einzelner Buchstabe ist eine Variante, kein Zusatz
+    expect(sameProduct(productKey('2 Hähnchenwurst B'), productKey('4. Hähnchenwurst C'))).toBe(false);
+    expect(sameProduct(productKey('Hähnchenwurst'), productKey('Hähnchenwurst B'))).toBe(false);
+  });
+});
+
+describe('Mengen ergaenzen statt ignorieren', () => {
+  const scanned = (raw: string, name: string, extra: Partial<ScanItem> = {}) => item({ raw, name, ...extra });
+  const plan = (existing: { id: string; text: string; is_completed: boolean }[], items: ScanItem[]) =>
+    planMerge(items, existing, 'shopping_list').map((r) => [r.text, r.action, r.selected, r.reason ?? null, r.targetId ?? null]);
+
+  it('"Pommes" + "Pommes" = "2 Pommes" (ohne Menge zaehlt als 1)', () => {
+    expect(plan([{ id: 'p', text: 'Pommes', is_completed: false }], [scanned('Pommes', 'Pommes')])).toEqual([
+      ['2 Pommes', 'increase', true, 'increase_quantity', 'p'],
+    ]);
+  });
+
+  it('"2 Pommes" + "3 Pommes" = "5 Pommes"', () => {
+    expect(plan([{ id: 'p', text: '2 Pommes', is_completed: false }], [scanned('3 Pommes', 'Pommes')])).toEqual([
+      ['5 Pommes', 'increase', true, 'increase_quantity', 'p'],
+    ]);
+  });
+
+  it('"Pommes frites" ist dasselbe wie "Pommes" (Wortregel, aelterer Workflow ohne match)', () => {
+    expect(plan([{ id: 'p', text: 'Pommes', is_completed: false }], [scanned('Pommes frites', 'Pommes frites')])).toEqual([
+      ['2 Pommes', 'increase', true, 'increase_quantity', 'p'],
+    ]);
+  });
+
+  it('"Pink Lady" ist "Aepfel", wenn das Sprachmodell es zuordnet — der gelesene Name bleibt erhalten', () => {
+    expect(
+      plan([{ id: 'a', text: 'Äpfel', is_completed: false }], [scanned('Pink Lady', 'Pink Lady', { match: 1, matchId: 'a' })])
+    ).toEqual([['2 Äpfel (Pink Lady)', 'increase', true, 'increase_quantity', 'a']]);
+    expect(
+      plan([{ id: 'a', text: '3 Äpfel', is_completed: false }], [scanned('2 Pink Lady', 'Pink Lady', { match: 1, matchId: 'a' })])
+    ).toEqual([['5 Äpfel (Pink Lady)', 'increase', true, 'increase_quantity', 'a']]);
+  });
+
+  it('hat das Modell abgeglichen und nichts gefunden (match 0), gilt die Wortregel nicht', () => {
+    // Paprika Chips sind keine Paprika — nur das Modell kann das wissen.
+    expect(plan([{ id: 'p', text: 'Paprika', is_completed: false }], [scanned('Paprika Chips', 'Paprika Chips', { match: 0 })])).toEqual([
+      ['Paprika Chips', 'add', true, null, null],
+    ]);
+    // Gleicher Name und Mehrzahl zaehlen weiter.
+    expect(plan([{ id: 'z', text: 'Zwiebel', is_completed: false }], [scanned('Zwiebeln', 'Zwiebeln', { match: 0 })])).toEqual([
+      ['2 Zwiebeln', 'increase', true, 'increase_quantity', 'z'],
+    ]);
+  });
+
+  it('zwei gelesene Zeilen fuer denselben Listeneintrag: nur die erste zaehlt', () => {
+    expect(
+      plan(
+        [{ id: 'p', text: 'Pommes', is_completed: false }],
+        [scanned('Pommes', 'Pommes', { match: 1, matchId: 'p' }), scanned('Frites', 'Frites', { match: 1, matchId: 'p' })]
+      )
+    ).toEqual([
+      ['2 Pommes', 'increase', true, 'increase_quantity', 'p'],
+      ['Frites', 'add', false, 'duplicate_scan', null],
+    ]);
+  });
+
+  it('addiert nicht, wenn die Mengen nicht zusammenpassen — stattdessen "steht schon drauf"', () => {
+    expect(plan([{ id: 'm', text: 'Mehl', is_completed: false }], [scanned('2 Packungen Mehl', 'Mehl')])).toEqual([
+      ['2 Packungen Mehl', 'add', false, 'duplicate_open', null],
+    ]);
+    expect(plan([{ id: 'b', text: '2-3 Bananen', is_completed: false }], [scanned('Bananen', 'Bananen')])).toEqual([
+      ['Bananen', 'add', false, 'duplicate_open', null],
+    ]);
+  });
+
+  it('ein abgehakter Eintrag wird wieder aktiviert, nicht aufsummiert', () => {
+    expect(plan([{ id: 'p', text: 'Pommes', is_completed: true }], [scanned('3 Pommes', 'Pommes')])).toEqual([
+      ['3 Pommes', 'reopen', true, 'reopen_completed', 'p'],
+    ]);
+  });
+
+  it('bevorzugt den offenen Eintrag vor dem abgehakten', () => {
+    const rows = plan(
+      [{ id: 'done', text: 'Pommes', is_completed: true }, { id: 'open', text: 'Pommes', is_completed: false }],
+      [scanned('Pommes', 'Pommes')]
+    );
+    expect(rows).toEqual([['2 Pommes', 'increase', true, 'increase_quantity', 'open']]);
+  });
+
+  it('Rezept ohne Mengenangabe addiert nichts', () => {
+    const rows = planMerge([item({ name: 'Backpulver' })], [{ id: 'b', text: 'Backpulver', is_completed: false }], 'recipe');
+    expect(rows.map((r) => [r.text, r.action, r.selected, r.reason ?? null])).toEqual([['Backpulver', 'add', false, 'duplicate_open']]);
+  });
+
+  it('ignoriert ein matchId, das nicht mehr auf der Liste steht', () => {
+    expect(plan([{ id: 'a', text: 'Äpfel', is_completed: false }], [scanned('Pink Lady', 'Pink Lady', { match: 3, matchId: 'weg' })])).toEqual([
+      ['Pink Lady', 'add', true, null, null],
+    ]);
+  });
+});
+
+describe('existingForScan', () => {
+  it('schickt offene Eintraege zuerst, ohne leere, hoechstens 150', () => {
+    const list = [
+      { id: '1', text: 'Erledigt', is_completed: true },
+      { id: '2', text: '  ', is_completed: false },
+      { id: '3', text: 'Offen', is_completed: false },
+    ];
+    expect(existingForScan(list).map((e) => e.id)).toEqual(['3', '1']);
+    const many = Array.from({ length: 200 }, (_, i) => ({ id: String(i), text: 'x' + i, is_completed: false }));
+    expect(existingForScan(many)).toHaveLength(150);
+  });
+});
+
+describe('parseScanResult: match', () => {
+  const payload = (items: unknown[]) => ({ ok: true, version: 1, sourceType: 'shopping_list', items });
+  it('liest match, wenn vorhanden, und laesst es sonst weg', () => {
+    const parsed = parseScanResult(
+      payload([
+        { raw: 'Pink Lady', name: 'Pink Lady', count: 0, unit: '', note: '', confidence: 'high', match: 2 },
+        { raw: 'Butter', name: 'Butter', count: 0, unit: '', note: '', confidence: 'high', match: 0 },
+        { raw: 'Brot', name: 'Brot', count: 0, unit: '', note: '', confidence: 'high' },
+        { raw: 'Kaputt', name: 'Kaputt', count: 0, unit: '', note: '', confidence: 'high', match: -4 },
+      ])
+    );
+    expect(parsed?.items.map((i) => i.match)).toEqual([2, 0, undefined, undefined]);
   });
 });

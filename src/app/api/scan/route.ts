@@ -22,6 +22,10 @@ const WEBHOOK_URL = process.env.N8N_SCAN_WEBHOOK_URL;
 const WEBHOOK_KEY = process.env.N8N_SCAN_WEBHOOK_KEY;
 
 const MAX_IMAGES = 3;
+// Aktuelle Liste fuer den Abgleich ("Pink Lady" = "Aepfel"): reiner Text, daher klein.
+const MAX_EXISTING = 150;
+const MAX_EXISTING_TEXT = 120;
+const MAX_EXISTING_JSON_CHARS = 40_000;
 // Der Client liefert ~0,5–1,2 MB pro Bild (2048 px, JPEG). Das Limit faengt
 // nur Ausreisser ab, z. B. einen Aufruf an der App vorbei.
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
@@ -37,6 +41,24 @@ const RATE_LIMIT_MAX_SCANS = 30;
 const scans = new Map<string, { count: number; resetAt: number }>();
 
 const NO_STORE = { "Cache-Control": "no-store" };
+
+// Optionales Formularfeld "existing": JSON-Liste { text, done }. Eine kaputte oder
+// zu grosse Liste ist kein Grund, den Scan abzulehnen — dann gibt es eben keinen Abgleich.
+// Leere Texte bleiben drin, weil die Position der Schluessel fuer "match" ist.
+function parseExisting(value: FormDataEntryValue | null): { text: string; done: boolean }[] {
+  if (typeof value !== "string" || value.length > MAX_EXISTING_JSON_CHARS) return [];
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.slice(0, MAX_EXISTING).map((entry) => {
+      const e = entry && typeof entry === "object" ? (entry as Record<string, unknown>) : {};
+      const text = typeof e.text === "string" ? e.text.replace(/\s+/g, " ").trim().slice(0, MAX_EXISTING_TEXT) : "";
+      return { text, done: e.done === true };
+    });
+  } catch {
+    return [];
+  }
+}
 
 const MESSAGES = {
   unauthenticated: "Deine Sitzung ist abgelaufen. Bitte melde dich neu an.",
@@ -115,6 +137,7 @@ export async function POST(request: Request) {
     images.push({ mediaType: file.type, data: Buffer.from(await file.arrayBuffer()).toString("base64") });
   }
 
+  const existing = parseExisting(form.get("existing"));
   const requestId = `scan_${crypto.randomUUID()}`;
 
   let upstream: Response;
@@ -122,7 +145,7 @@ export async function POST(request: Request) {
     upstream = await fetch(WEBHOOK_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Notiz-Scan-Key": WEBHOOK_KEY },
-      body: JSON.stringify({ version: 1, requestId, images }),
+      body: JSON.stringify({ version: 1, requestId, images, ...(existing.length > 0 ? { existing } : {}) }),
       signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
       cache: "no-store",
     });

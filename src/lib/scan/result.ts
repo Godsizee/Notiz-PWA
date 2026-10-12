@@ -13,6 +13,14 @@ export interface ScanItem {
   unit: ScanUnit;
   note: string;
   confidence: ScanConfidence;
+  /**
+   * Abgleich durch das Sprachmodell: 1-basierte Nummer des Listeneintrags, den der
+   * Workflow als dasselbe Produkt erkannt hat ("Pink Lady" = "Äpfel"), 0 = kein
+   * Treffer. Fehlt das Feld (aelterer Workflow), hat niemand abgeglichen.
+   */
+  match?: number;
+  /** Aus match aufgeloeste Id des Listeneintrags (setzt der ScanSheet). */
+  matchId?: string;
 }
 
 export interface ScanResult {
@@ -50,7 +58,11 @@ export function parseScanResult(json: unknown): ScanResult | null {
     const unit = (SCAN_UNITS as readonly string[]).includes(it.unit as string) ? (it.unit as ScanUnit) : '';
     const confidence: ScanConfidence =
       it.confidence === 'high' || it.confidence === 'low' ? it.confidence : 'medium';
-    items.push({ raw: cleanString(it.raw, 120), name, count, unit, note: cleanString(it.note, 40), confidence });
+    const match = typeof it.match === 'number' && Number.isInteger(it.match) && it.match >= 0 && it.match <= 500 ? it.match : undefined;
+    items.push({
+      raw: cleanString(it.raw, 120), name, count, unit, note: cleanString(it.note, 40), confidence,
+      ...(match !== undefined ? { match } : {}),
+    });
   }
 
   const sourceType: ScanSourceType =

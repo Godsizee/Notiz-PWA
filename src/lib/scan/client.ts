@@ -20,13 +20,24 @@ export class ScanError extends Error {
 // Fehlermeldung ankommt, statt dass der Client vorher aufgibt.
 const CLIENT_TIMEOUT_MS = 110_000;
 
-export async function requestScan(images: Blob[], signal?: AbortSignal): Promise<ScanResult> {
+/** Ein Eintrag der aktuellen Liste, mit dem der Workflow die gelesenen Eintraege abgleicht. */
+export interface ScanListEntry {
+  text: string;
+  done: boolean;
+}
+
+/**
+ * @param existing aktuelle Liste (siehe existingForScan); der Workflow sagt je
+ *                 gelesenem Eintrag, welcher davon dasselbe Produkt meint (ScanItem.match)
+ */
+export async function requestScan(images: Blob[], existing: ScanListEntry[], signal?: AbortSignal): Promise<ScanResult> {
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
     throw new ScanError('offline', 'Keine Internetverbindung – der Foto-Scan braucht Netz.');
   }
 
   const form = new FormData();
   images.forEach((blob, index) => form.append('image', blob, `scan-${index + 1}.jpg`));
+  if (existing.length > 0) form.append('existing', JSON.stringify(existing));
 
   const timeout = AbortSignal.timeout(CLIENT_TIMEOUT_MS);
   const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;

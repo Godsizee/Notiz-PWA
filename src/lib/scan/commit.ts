@@ -12,6 +12,8 @@ export interface ScanCommit {
   records: RecordModel[];
   createdIds: string[];
   reopened: { id: string; previousText: string }[];
+  /** Offene Eintraege, deren Menge ergaenzt wurde ("Pommes" → "2 Pommes"). */
+  increased: { id: string; previousText: string }[];
   failed: number;
 }
 
@@ -25,7 +27,7 @@ export async function commitScanRows(
   startOrder: number,
   existingTextById: Map<string, string>
 ): Promise<ScanCommit> {
-  const commit: ScanCommit = { records: [], createdIds: [], reopened: [], failed: 0 };
+  const commit: ScanCommit = { records: [], createdIds: [], reopened: [], increased: [], failed: 0 };
 
   // `order` wird vorab vergeben, damit die Reihenfolge des Fotos erhalten
   // bleibt, egal in welcher Reihenfolge die parallelen Writes fertig werden.
@@ -46,6 +48,16 @@ export async function commitScanRows(
             });
             commit.records.push(record);
             commit.reopened.push({ id: row.targetId, previousText: existingTextById.get(row.targetId) ?? text });
+          } else if (row.action === 'increase' && row.targetId) {
+            // Nur der Text aendert sich; Reihenfolge und Haken des Eintrags bleiben.
+            const record = await applyChange({
+              collection: 'checklist_items',
+              action: 'update',
+              id: row.targetId,
+              data: { note: noteId, text },
+            });
+            commit.records.push(record);
+            commit.increased.push({ id: row.targetId, previousText: row.previousText ?? existingTextById.get(row.targetId) ?? text });
           } else {
             const id = newRecordId();
             const record = await applyChange({
@@ -68,7 +80,7 @@ export async function commitScanRows(
   return commit;
 }
 
-/** Macht einen Commit rueckgaengig: neue Eintraege loeschen, reaktivierte wieder abhaken. */
+/** Macht einen Commit rueckgaengig: neue Eintraege loeschen, reaktivierte wieder abhaken, Mengen zuruecksetzen. */
 export async function undoScanCommit(noteId: string, commit: ScanCommit): Promise<void> {
   await Promise.all([
     ...commit.createdIds.map((id) =>
@@ -80,6 +92,14 @@ export async function undoScanCommit(noteId: string, commit: ScanCommit): Promis
         action: 'update',
         id,
         data: { note: noteId, text: previousText, is_completed: true },
+      }).catch(() => {})
+    ),
+    ...commit.increased.map(({ id, previousText }) =>
+      applyChange({
+        collection: 'checklist_items',
+        action: 'update',
+        id,
+        data: { note: noteId, text: previousText },
       }).catch(() => {})
     ),
   ]);
