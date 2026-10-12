@@ -1,6 +1,6 @@
 // Mengen-Badge am Zeilenanfang ("2 Packungen Mehl" → Badge "2 Packungen", Text "Mehl").
 //
-// Die Einheitenliste muss jede Einheit kennen, die src/lib/scan/format.ts
+// Die Einheitenliste muss jede Einheit kennen, die src/lib/scan/merge.ts
 // schreiben kann — sonst zeigt der Badge bei gescannten Einträgen nur die Zahl.
 // Vorher stand hier `packung[en]?`: eine Zeichenklasse, die genau EIN Zeichen
 // erlaubt, weshalb "2 Packungen Mehl" nur den Badge "2" bekam.
