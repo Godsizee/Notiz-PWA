@@ -8,6 +8,7 @@ import { X, Share2, Trash2, Download, Star } from 'lucide-react';
 import { useImageSrc, imageUrl, shareImage, type ImageVariant } from '@/lib/noteImages';
 import { blobGet } from '@/lib/offlineDb';
 import { hapticLight, hapticMedium } from '@/lib/haptics';
+import { useEscapeKey } from '@/lib/useEscapeKey';
 
 // Full-screen image viewer.
 //
@@ -135,16 +136,17 @@ export default function ImageViewer({
     };
   }, [trackX]);
 
-  // Keyboard support for the desktop case.
+  // Keyboard support for the desktop case. Escape laeuft ueber useEscapeKey,
+  // damit es nur den Viewer schliesst und nicht auch die Notiz dahinter.
+  useEscapeKey(true, onClose);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
       if (e.key === 'ArrowRight') goTo(indexRef.current + 1);
       if (e.key === 'ArrowLeft') goTo(indexRef.current - 1);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose, goTo]);
+  }, [goTo]);
 
   // Closing the last image leaves nothing to show.
   useEffect(() => {

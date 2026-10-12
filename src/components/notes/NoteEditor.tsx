@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { RecordModel } from 'pocketbase';
 import { pb, isOwnedByMe } from '@/lib/pb';
-import { Palette, Pin, Archive, Trash2, Check, ExternalLink, RefreshCw, Users, ImagePlus, Camera, Images, ClipboardPaste, ChevronDown } from 'lucide-react';
+import { Palette, Pin, Archive, Trash2, Check, ExternalLink, RefreshCw, Users, Plus, MoreVertical, Camera, Images, ClipboardPaste } from 'lucide-react';
 import { getNoteColorStyles, NOTE_COLORS } from '@/lib/colors';
 import { applyChange, newRecordId } from '@/lib/sync';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -12,6 +12,8 @@ import { useSyncStore } from '@/store/useSyncStore';
 import { hapticLight } from '@/lib/haptics';
 import NoteImageGallery from '@/components/notes/NoteImageGallery';
 import ImageViewer from '@/components/notes/ImageViewer';
+import { NoteTopBar, NoteBottomBar, BarButton } from '@/components/notes/NoteBars';
+import { useEscapeKey } from '@/lib/useEscapeKey';
 
 interface NoteEditorProps {
   note?: RecordModel | null; // null if creating a new note
@@ -23,11 +25,13 @@ interface NoteEditorProps {
   onClose: () => void;
   /** Eine neue Notiz wurde zum ersten Mal gespeichert (HomeScreen stellt die URL um). */
   onCreated?: (id: string) => void;
+  /** Notiz wurde ueber die Leiste (un)archiviert und gleich geschlossen — HomeScreen zeigt die Snackbar. */
+  onArchived?: (id: string, archived: boolean) => void;
   /** When provided, deleting routes through the app's soft-delete + undo toast. */
   onRequestDelete?: (noteId: string) => void;
 }
 
-export default function NoteEditor({ note, imagesByNote, onClose, onCreated, onRequestDelete }: NoteEditorProps) {
+export default function NoteEditor({ note, imagesByNote, onClose, onCreated, onArchived, onRequestDelete }: NoteEditorProps) {
   const [title, setTitle] = useState(note?.title || '');
   const [content, setContent] = useState(note?.content || '');
   const [color, setColor] = useState(note?.color || 'white');
@@ -36,11 +40,15 @@ export default function NoteEditor({ note, imagesByNote, onClose, onCreated, onR
   const [isShared, setIsShared] = useState(note?.is_shared || false);
   const [showPalette, setShowPalette] = useState(false);
   const [showImageMenu, setShowImageMenu] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isAttaching, setIsAttaching] = useState(false);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [isDropTarget, setIsDropTarget] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const titleFieldRef = useRef<HTMLTextAreaElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const showToast = useToastStore((s) => s.showToast);
@@ -185,6 +193,7 @@ export default function NoteEditor({ note, imagesByNote, onClose, onCreated, onR
         setActiveNoteId(record.id);
         onCreatedRef.current?.(record.id);
       }
+      setLastSavedAt(new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }));
     } catch (err) {
       console.error("Failed to auto-save note:", err);
     } finally {
@@ -245,6 +254,44 @@ export default function NoteEditor({ note, imagesByNote, onClose, onCreated, onR
     }
     onClose();
   };
+
+  // Archivieren schliesst die Notiz (Keep-Verhalten); HomeScreen zeigt die
+  // Snackbar "Archiviert · Rueckgaengig".
+  const handleArchiveAndClose = () => {
+    const id = activeNoteIdRef.current;
+    if (!id) return;
+    const next = !isArchivedRef.current;
+    // Direkt speichern statt auf den Debounce zu hoffen: der Editor wird gleich
+    // unmountet, und das Flushen beim Unmount greift nur bei laufendem Timer.
+    isArchivedRef.current = next;
+    setIsArchived(next);
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    void performSave();
+    onArchived?.(id, next);
+    onClose();
+  };
+
+  // Titel in der oberen Leiste erst zeigen, wenn der grosse Titel weggescrollt ist.
+  const [titleHidden, setTitleHidden] = useState(false);
+  useEffect(() => {
+    const el = titleFieldRef.current;
+    const root = scrollRef.current;
+    if (!el || !root) return;
+    const io = new IntersectionObserver(([e]) => setTitleHidden(!e.isIntersecting), { root, threshold: 0 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  const closePopovers = () => {
+    setShowPalette(false);
+    setShowImageMenu(false);
+    setShowMoreMenu(false);
+  };
+  // Escape schliesst das offene Popover, nicht die Notiz (useEscapeKey).
+  useEscapeKey(showPalette || showImageMenu || showMoreMenu, closePopovers);
 
   // --- Images ---
 
@@ -340,9 +387,157 @@ export default function NoteEditor({ note, imagesByNote, onClose, onCreated, onR
   const imageMenuItem =
     'w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--background)]/80 transition-colors cursor-pointer text-left whitespace-nowrap';
 
+  // Obere Leiste: die Zustands-Aktionen der Notiz (wie in Keep).
+  const topActions = (
+    <>
+      <BarButton
+        label={canShare ? (isShared ? 'Nicht mehr teilen' : 'Mit Partner teilen') : 'Nur wer die Notiz angelegt hat, kann das Teilen beenden'}
+        pressed={isShared}
+        disabled={!canShare}
+        onClick={() => setIsShared(!isShared)}
+      >
+        <Users size={20} />
+      </BarButton>
+      <BarButton label={isPinned ? 'Anpinnen aufheben' : 'Anpinnen'} pressed={isPinned} onClick={() => setIsPinned(!isPinned)}>
+        <Pin size={20} className={isPinned ? 'fill-current' : ''} />
+      </BarButton>
+      <BarButton
+        label={isArchived ? 'Aus dem Archiv holen' : 'Archivieren'}
+        pressed={isArchived}
+        disabled={!activeNoteId}
+        onClick={handleArchiveAndClose}
+      >
+        <Archive size={20} />
+      </BarButton>
+    </>
+  );
+
+  // Untere Leiste links: Bild hinzufuegen und Farbe. Die Popover haengen an der
+  // Leiste selbst (sticky = Bezugsrahmen) und bleiben so ueber der Tastatur,
+  // auch wenn iOS die Leiste per Transform nach oben schiebt.
+  const bottomLeading = (
+    <>
+      <BarButton
+        label="Bild hinzufügen"
+        expanded={showImageMenu}
+        disabled={images.length >= MAX_IMAGES_PER_NOTE}
+        onClick={() => { const next = !showImageMenu; closePopovers(); setShowImageMenu(next); }}
+      >
+        <Plus size={22} />
+      </BarButton>
+      <BarButton
+        label="Farbe ändern"
+        expanded={showPalette}
+        onClick={() => { const next = !showPalette; closePopovers(); setShowPalette(next); }}
+      >
+        <Palette size={20} />
+      </BarButton>
+
+      <AnimatePresence>
+        {showImageMenu && (
+          <motion.div
+            key="image-menu"
+            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            className="absolute bottom-full left-2 mb-2 z-30 bg-[var(--card-bg)] border border-[var(--border-color)] shadow-[var(--shadow-elevated)] rounded-2xl p-1.5 min-w-[11rem]"
+          >
+            <button
+              className={imageMenuItem}
+              onClick={() => { setShowImageMenu(false); cameraInputRef.current?.click(); }}
+            >
+              <Camera className="w-4 h-4 text-primary" /> Foto aufnehmen
+            </button>
+            <button
+              className={imageMenuItem}
+              onClick={() => { setShowImageMenu(false); galleryInputRef.current?.click(); }}
+            >
+              <Images className="w-4 h-4 text-primary" /> Aus Galerie
+            </button>
+            <button
+              className={imageMenuItem}
+              onClick={() => { setShowImageMenu(false); pasteFromClipboard(); }}
+            >
+              <ClipboardPaste className="w-4 h-4 text-primary" /> Einfügen
+            </button>
+          </motion.div>
+        )}
+
+        {showPalette && (
+          <motion.div
+            key="palette"
+            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            className="absolute bottom-full left-2 mb-2 z-30 bg-[var(--card-bg)] border border-[var(--border-color)] shadow-[var(--shadow-elevated)] rounded-2xl p-3 flex flex-wrap gap-2 max-w-[min(18rem,calc(100vw-1rem))]"
+          >
+            {NOTE_COLORS.map(c => (
+              <button
+                key={c.id}
+                className="w-9 h-9 rounded-full border border-black/10 shadow-inner transition-transform hover:scale-110 relative flex items-center justify-center cursor-pointer"
+                style={{ backgroundColor: c.hex }}
+                onClick={() => { setColor(c.hex); setShowPalette(false); }}
+                title={c.label}
+                aria-label={c.label}
+                aria-pressed={color === c.hex}
+              >
+                {color === c.hex && (
+                  <Check className="w-4 h-4 text-slate-800" />
+                )}
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+
+  const statusText = isSaving || isAttaching
+    ? 'Speichert…'
+    : !isOnline
+      ? 'Lokal gespeichert'
+      : lastSavedAt
+        ? `Bearbeitet ${lastSavedAt}`
+        : 'Gespeichert';
+
+  // Untere Leiste rechts: Mehr-Menue (Popover geht nach oben auf).
+  const bottomTrailing = (
+    <>
+      <BarButton
+        label="Mehr"
+        expanded={showMoreMenu}
+        onClick={() => { const next = !showMoreMenu; closePopovers(); setShowMoreMenu(next); }}
+      >
+        <MoreVertical size={20} />
+      </BarButton>
+
+      <AnimatePresence>
+        {showMoreMenu && (
+          <motion.div
+            key="more-menu"
+            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            className="absolute bottom-full right-2 mb-2 z-30 bg-card border border-[var(--border-color)] shadow-2xl rounded-2xl p-2 flex flex-col gap-1 min-w-[200px]"
+          >
+            <button
+              onClick={() => { setShowMoreMenu(false); handleDelete(); }}
+              disabled={!canDelete}
+              title={canDelete ? undefined : 'Nur wer die Notiz angelegt hat, kann sie löschen'}
+              className="flex items-center gap-2.5 px-3 py-3 rounded-xl text-sm font-semibold text-red-500 hover:bg-red-500/5 transition-colors cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Notiz löschen</span>
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+
   return (
     <div
-      className="flex flex-col h-full min-h-[55vh] p-6 pb-28 rounded-t-3xl transition-colors duration-300"
+      className={`relative flex min-h-0 flex-1 flex-col transition-colors duration-300 ${colorStyles.bg}`}
       style={colorStyles.style}
       onDragOver={(e) => {
         if (!e.dataTransfer.types.includes('Files')) return;
@@ -376,6 +571,16 @@ export default function NoteEditor({ note, imagesByNote, onClose, onCreated, onR
         className="hidden"
       />
 
+      <NoteTopBar
+        onBack={onClose}
+        title={title || 'Notiz'}
+        showTitle={titleHidden}
+        scrollRef={scrollRef}
+        actions={topActions}
+      />
+
+      <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain px-6 pb-6">
+      <div className="flex min-h-full flex-col">
       {/* Image gallery — above the title, Google Keep style */}
       <NoteImageGallery
         images={images}
@@ -391,10 +596,11 @@ export default function NoteEditor({ note, imagesByNote, onClose, onCreated, onR
       )}
 
       {/* Title Textarea */}
-      <div className="flex items-start gap-2 mb-4">
+      <div className="mb-4 pt-1">
         <textarea
+          ref={titleFieldRef}
           placeholder="Titel"
-          className="min-w-0 flex-1 text-2xl font-extrabold bg-transparent border-none focus:outline-none resize-none text-[var(--text-primary)] placeholder-[var(--text-muted)]/40 leading-snug"
+          className="w-full text-2xl font-extrabold bg-transparent border-none focus:outline-none resize-none text-[var(--text-primary)] placeholder-[var(--text-muted)]/40 leading-snug"
           rows={1}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -405,14 +611,6 @@ export default function NoteEditor({ note, imagesByNote, onClose, onCreated, onR
             }
           }}
         />
-        <button
-          onClick={onClose}
-          className="tap-target -mr-2 -mt-1 shrink-0 rounded-xl text-[var(--text-secondary)] hover:bg-[var(--background)]/80 cursor-pointer"
-          aria-label="Notiz schließen"
-          title="Schließen"
-        >
-          <ChevronDown className="w-6 h-6" />
-        </button>
       </div>
 
       {/* Content Textarea */}
@@ -451,6 +649,9 @@ export default function NoteEditor({ note, imagesByNote, onClose, onCreated, onR
         </div>
       )}
 
+      </div>
+      </div>
+
       {/* Desktop drag & drop affordance */}
       {isDropTarget && (
         <div className="absolute inset-3 rounded-3xl border-2 border-dashed border-primary/60 bg-primary/5 flex items-center justify-center pointer-events-none z-40">
@@ -458,173 +659,7 @@ export default function NoteEditor({ note, imagesByNote, onClose, onCreated, onR
         </div>
       )}
 
-      {/* Floating Design Toolbar */}
-      <div
-        className="absolute bottom-4 left-3 right-3 sm:bottom-6 sm:left-6 sm:right-6 h-14 bg-[var(--card-bg)]/85 backdrop-blur-xl border border-[var(--border-color)] rounded-2xl shadow-[var(--shadow-elevated)] flex items-center justify-between px-2 sm:px-4 z-50"
-        style={{ marginBottom: "env(safe-area-inset-bottom)" }}
-      >
-
-        {/* Left Actions */}
-        <div className="flex items-center gap-1 sm:gap-3.5 relative">
-
-          {/* Palette button */}
-          <button
-            onClick={() => { setShowPalette(!showPalette); setShowImageMenu(false); }}
-            className="shrink-0 w-10 h-10 xs:w-11 xs:h-11 rounded-xl hover:bg-[var(--background)]/80 flex items-center justify-center transition-colors text-[var(--text-secondary)] cursor-pointer"
-            title="Farbe ändern"
-            aria-label="Farbe ändern"
-            aria-expanded={showPalette}
-          >
-            <Palette size={19} />
-          </button>
-
-          {/* Color choice popover */}
-          <AnimatePresence>
-            {showPalette && (
-              <motion.div
-                initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                className="absolute bottom-16 left-0 bg-[var(--card-bg)] border border-[var(--border-color)] shadow-[var(--shadow-elevated)] rounded-2xl p-3 flex flex-wrap gap-2 max-w-[min(18rem,calc(100vw-1.5rem))] z-[60]"
-              >
-                {NOTE_COLORS.map(c => {
-                  return (
-                    <button
-                      key={c.id}
-                      className="w-7 h-7 rounded-full border border-black/10 shadow-inner transition-transform hover:scale-115 relative flex items-center justify-center cursor-pointer"
-                      style={{ backgroundColor: c.hex }}
-                      onClick={() => { setColor(c.hex); setShowPalette(false); }}
-                      title={c.label}
-                      aria-label={c.label}
-                      aria-pressed={color === c.hex}
-                    >
-                      {color === c.hex && (
-                        <Check className="w-4 h-4 text-slate-800" />
-                      )}
-                    </button>
-                  );
-                })}
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          <div className="h-6 w-px bg-[var(--border-color)] mx-0.5 shrink-0"></div>
-
-          {/* Image button — one slot, a small sheet behind it. Two separate
-              buttons (camera + gallery) would not fit next to the existing
-              actions on a foldable's cover display. */}
-          <button
-            onClick={() => { setShowImageMenu(!showImageMenu); setShowPalette(false); }}
-            disabled={images.length >= MAX_IMAGES_PER_NOTE}
-            className={`shrink-0 w-10 h-10 xs:w-11 xs:h-11 rounded-xl flex items-center justify-center transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${showImageMenu ? 'bg-primary/10 text-primary' : 'text-[var(--text-secondary)] hover:bg-[var(--background)]/80'}`}
-            title="Bild hinzufügen"
-            aria-label="Bild hinzufügen"
-            aria-expanded={showImageMenu}
-          >
-            <ImagePlus size={19} />
-          </button>
-
-          <AnimatePresence>
-            {showImageMenu && (
-              <motion.div
-                initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                className="absolute bottom-16 left-0 bg-[var(--card-bg)] border border-[var(--border-color)] shadow-[var(--shadow-elevated)] rounded-2xl p-1.5 z-[60] min-w-[11rem]"
-              >
-                <button
-                  className={imageMenuItem}
-                  onClick={() => { setShowImageMenu(false); cameraInputRef.current?.click(); }}
-                >
-                  <Camera className="w-4 h-4 text-primary" /> Foto aufnehmen
-                </button>
-                <button
-                  className={imageMenuItem}
-                  onClick={() => { setShowImageMenu(false); galleryInputRef.current?.click(); }}
-                >
-                  <Images className="w-4 h-4 text-primary" /> Aus Galerie
-                </button>
-                <button
-                  className={imageMenuItem}
-                  onClick={() => { setShowImageMenu(false); pasteFromClipboard(); }}
-                >
-                  <ClipboardPaste className="w-4 h-4 text-primary" /> Einfügen
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Pin Button */}
-          <button
-            onClick={() => setIsPinned(!isPinned)}
-            className={`shrink-0 w-10 h-10 xs:w-11 xs:h-11 rounded-xl flex items-center justify-center transition-colors cursor-pointer ${isPinned ? 'bg-primary/10 text-primary' : 'text-[var(--text-secondary)] hover:bg-[var(--background)]/80'}`}
-            title="Notiz anpinnen"
-            aria-label="Notiz anpinnen"
-            aria-pressed={isPinned}
-          >
-            <Pin size={19} className={isPinned ? 'fill-current' : ''} />
-          </button>
-
-          {/* Archive Button */}
-          <button
-            onClick={() => setIsArchived(!isArchived)}
-            className={`shrink-0 w-10 h-10 xs:w-11 xs:h-11 rounded-xl flex items-center justify-center transition-colors cursor-pointer ${isArchived ? 'bg-orange-500/10 text-orange-500' : 'text-[var(--text-secondary)] hover:bg-[var(--background)]/80'}`}
-            title="Archivieren"
-            aria-label="Archivieren"
-            aria-pressed={isArchived}
-          >
-            <Archive size={19} />
-          </button>
-
-          {/* Share Button */}
-          <button
-            onClick={() => setIsShared(!isShared)}
-            disabled={!canShare}
-            className={`shrink-0 w-10 h-10 xs:w-11 xs:h-11 rounded-xl flex items-center justify-center transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${isShared ? 'bg-primary/10 text-primary' : 'text-[var(--text-secondary)] hover:bg-[var(--background)]/80'}`}
-            title={canShare
-              ? (isShared ? 'Nicht mehr teilen' : 'Mit Partner teilen')
-              : 'Nur wer die Notiz angelegt hat, kann das Teilen beenden'}
-            aria-label={isShared ? 'Nicht mehr teilen' : 'Mit Partner teilen'}
-            aria-pressed={isShared}
-          >
-            <Users size={19} />
-          </button>
-        </div>
-
-        {/* Right Actions & Status */}
-        <div className="flex items-center gap-1 sm:gap-3">
-
-          {/* Save Status Indicator — below `xs` (foldable cover display) it
-              sheds its chrome and shows the bare icon, to leave room for the
-              extra toolbar slot. */}
-          <div className="shrink-0 flex items-center gap-1.5 text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider rounded-full px-0 xs:px-2.5 py-1 xs:bg-[var(--background)]/50 xs:border xs:border-[var(--border-color)]">
-            {isSaving ? (
-              <>
-                <RefreshCw className="w-3 h-3 animate-spin text-primary" />
-                <span className="hidden xs:inline">Speichert…</span>
-              </>
-            ) : (
-              <>
-                <Check className="w-3 h-3 text-green-500" />
-                <span className="hidden xs:inline">{isOnline ? 'Gespeichert' : 'Lokal gespeichert'}</span>
-              </>
-            )}
-          </div>
-
-          <div className="hidden xs:block h-6 w-px bg-[var(--border-color)] mx-0.5"></div>
-
-          {/* Delete Button */}
-          <button
-            onClick={handleDelete}
-            disabled={!canDelete}
-            className="shrink-0 w-10 h-10 xs:w-11 xs:h-11 rounded-xl hover:bg-red-500/10 flex items-center justify-center text-red-500 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-            title={canDelete ? 'Löschen' : 'Nur wer die Notiz angelegt hat, kann sie löschen'}
-            aria-label="Notiz löschen"
-          >
-            <Trash2 size={19} />
-          </button>
-        </div>
-      </div>
+      <NoteBottomBar leading={bottomLeading} status={statusText} trailing={bottomTrailing} />
 
       {viewerIndex !== null && images.length > 0 && (
         <ImageViewer

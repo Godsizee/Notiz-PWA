@@ -485,7 +485,11 @@ export default function HomeScreen() {
       <NoteScreen
         open={isNoteOpen}
         variant={isWide ? "pane" : "overlay"}
-        layoutId={session?.id ? `note-${session.id}` : undefined}
+        // Nur bestehende Notizen morphen aus ihrer Karte. Eine neue Notiz bekommt
+        // ihre ID erst beim Speichern; liefe sie dann mit derselben layoutId wie
+        // die frisch angelegte Karte, bliebe der Crossfade bei ~98 % haengen und
+        // die Uebersicht schimmerte durch.
+        layoutId={session?.note ? `note-${session.note.id}` : undefined}
         label={session?.type === "checklist" ? "Liste bearbeiten" : "Notiz bearbeiten"}
       >
         {!session ? (
@@ -511,6 +515,7 @@ export default function HomeScreen() {
             imagesByNote={imagesByNote}
             onClose={closeNote}
             onCreated={handleCreated}
+            onArchived={handleArchivedFromEditor}
             onRequestDelete={requestDeleteFromEditor}
           />
         )}
