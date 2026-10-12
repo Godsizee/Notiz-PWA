@@ -5,14 +5,14 @@ interface ShortcutHandlers {
   onNewChecklist?: () => void;
   onEscape?: () => void;
   onDeleteInEditor?: () => void;
-  /** True while an editor/sheet is open (enables Ctrl/Cmd+Backspace delete). */
+  /** True while a note is open (enables Ctrl/Cmd+Backspace delete). */
   isEditing?: boolean;
 }
 
 // Desktop keyboard layer:
 //   N  → new free-text note
 //   L  → new checklist
-//   Esc → close the open sheet
+//   Esc → Notiz schliessen (wie Zurueck); Popover und Viewer fangen Escape vorher ab (useEscapeKey)
 //   Ctrl/Cmd+Backspace → delete the note currently being edited
 export function useKeyboardShortcuts({
   onNewNote,

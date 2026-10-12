@@ -281,8 +281,10 @@ export default function HomeScreen() {
 
   // Keyboard shortcuts (desktop)
   useKeyboardShortcuts({
-    onNewNote: openText,
-    onNewChecklist: openChecklist,
+    // Bei offener Vollbild-Notiz sind N/L gesperrt (die Uebersicht ist inert);
+    // in der Liste-Detail-Ansicht ab 1024 px bleiben sie erlaubt.
+    onNewNote: () => { if (!isNoteOpen || isWide) openText(); },
+    onNewChecklist: () => { if (!isNoteOpen || isWide) openChecklist(); },
     onEscape: () => {
       if (isNoteOpen) closeNote();
     },
