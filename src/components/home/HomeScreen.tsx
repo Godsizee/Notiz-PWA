@@ -33,11 +33,13 @@ import { useMediaQuery } from "@/lib/useViewport";
 
 const UNDO_DELETE_MS = 5000;
 
+// Masonry-Schluessel sind Max-Breiten: bis 359 px eine Spalte, ab 360 px zwei,
+// ab 769 px drei.
 const breakpointColumnsObj = {
   default: 3,
   1100: 3,
   768: 2,
-  500: 1,
+  359: 1,
 };
 
 export default function HomeScreen() {

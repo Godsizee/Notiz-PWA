@@ -6,7 +6,6 @@ import { Pin, Circle, CheckCircle2, ListTodo, FileText, Archive, ArchiveRestore,
 import { useRealtimeChecklist } from '@/lib/useRealtime';
 import { motion, useMotionValue, useTransform, type PanInfo } from 'framer-motion';
 import { getNoteColorStyles } from '@/lib/colors';
-import { formatRelative } from '@/lib/relativeTime';
 import { hapticMedium } from '@/lib/haptics';
 import ContextMenu from '@/components/ui/ContextMenu';
 import { parseQuantity } from '@/lib/quantities';
@@ -31,6 +30,7 @@ interface NoteCardProps {
 
 const SWIPE_THRESHOLD = 90; // px the card must travel to fire the swipe action
 const LONG_PRESS_MS = 400;
+const MAX_PREVIEW_ITEMS = 6;
 const MOVE_TOLERANCE = 10; // px of movement that cancels a long-press
 
 export default function NoteCard({
@@ -61,7 +61,8 @@ export default function NoteCard({
   const longPressFired = useRef(false);
   const pressStart = useRef<{ x: number; y: number } | null>(null);
 
-  const visibleItems = items.slice(0, 5);
+  const visibleItems = items.slice(0, MAX_PREVIEW_ITEMS);
+  const openCount = items.length - completedCount;
 
   const clearLongPress = () => {
     if (longPressTimer.current) {
@@ -110,10 +111,10 @@ export default function NoteCard({
     }
   };
 
-  const revealRound = isList ? 'rounded-2xl' : 'rounded-3xl';
+  const revealRound = 'rounded-2xl';
 
   return (
-    <div className={`relative break-inside-avoid ${isList ? 'mb-2.5' : 'mb-4'}`}>
+    <div className={`relative break-inside-avoid ${isList ? 'mb-2.5' : 'mb-3'}`}>
       {/* Swipe-right reveal: Pin (sits on the left, behind the card) */}
       <motion.div
         style={{ opacity: pinRevealOpacity }}
@@ -159,7 +160,7 @@ export default function NoteCard({
           setMenuPos({ x: e.clientX, y: e.clientY });
         }}
         className={`cursor-pointer border shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-elevated)] transition-shadow duration-300 relative overflow-hidden group select-none ${colorStyles.bg} ${
-          isList ? 'rounded-2xl p-3.5 flex items-center gap-3' : 'rounded-3xl p-5'
+          isList ? 'rounded-2xl p-3.5 flex items-center gap-3' : 'rounded-2xl p-3.5'
         }`}
         style={{ x, ...colorStyles.style }}
       >
@@ -199,14 +200,11 @@ export default function NoteCard({
             </div>
 
             {/* Meta */}
-            <div className="shrink-0 flex flex-col items-end gap-1">
-              {note.is_shared && <Users className="w-3.5 h-3.5 text-primary/80" />}
-              {(note.updated || note.created) && (
-                <span className="text-[11px] text-[var(--text-muted)]">
-                  {formatRelative(note.updated || note.created)}
-                </span>
-              )}
-            </div>
+            {note.is_shared && (
+              <span role="img" aria-label="Geteilt" title="Geteilt" className="shrink-0">
+                <Users className="w-3.5 h-3.5 text-primary/80" />
+              </span>
+            )}
           </>
         ) : (
         <>
@@ -222,7 +220,7 @@ export default function NoteCard({
 
         {/* Title */}
         {note.title ? (
-          <h3 className="font-bold text-base md:text-lg mb-3 pr-6 text-[var(--text-primary)] leading-snug group-hover:text-primary transition-colors duration-200">
+          <h3 className="font-semibold text-base mb-2.5 pr-6 text-[var(--text-primary)] leading-snug group-hover:text-primary transition-colors duration-200">
             {note.title}
           </h3>
         ) : (
@@ -245,7 +243,7 @@ export default function NoteCard({
         {note.type === 'text' && note.content && (
           <NoteContent
             text={note.content}
-            className="text-[var(--text-secondary)] text-sm whitespace-pre-wrap line-clamp-6 leading-relaxed break-words"
+            className="text-[var(--text-secondary)] text-sm whitespace-pre-wrap line-clamp-8 leading-relaxed break-words"
           />
         )}
 
@@ -278,11 +276,11 @@ export default function NoteCard({
               </div>
             ))}
 
-            {items.length > 5 && (
+            {items.length > MAX_PREVIEW_ITEMS && (
               <div className="pt-2.5 flex items-center gap-2">
                 <div className="h-[1px] flex-1 bg-[var(--border-color)]"></div>
                 <p className="text-[11px] font-extrabold text-[var(--text-muted)] uppercase tracking-widest bg-background/50 px-2 py-0.5 rounded-full border border-[var(--border-color)]">
-                  + {items.length - 5} weitere
+                  + {items.length - MAX_PREVIEW_ITEMS} weitere
                 </p>
                 <div className="h-[1px] flex-1 bg-[var(--border-color)]"></div>
               </div>
@@ -296,21 +294,24 @@ export default function NoteCard({
           </div>
         )}
 
-        {/* Shared indicator + relative timestamp */}
-        {(note.updated || note.created || note.is_shared) && (
-          <div className="mt-3 flex items-center justify-between gap-2">
-            {note.is_shared ? (
-              <span className="flex items-center gap-1 text-[11px] font-bold text-primary/80 uppercase tracking-wider">
-                <Users className="w-3 h-3" />
-                Geteilt
+        {/* Fortschritt (offen/gesamt) und Geteilt-Symbol. Die Datenbank kennt kein
+            created/updated, eine relative Zeit gibt es darum nicht. */}
+        {((note.type === 'checklist' && items.length > 0) || note.is_shared) && (
+          <div className="mt-2.5 flex items-center justify-between gap-2">
+            {note.type === 'checklist' && items.length > 0 ? (
+              <span
+                className="text-xs font-semibold text-[var(--text-muted)]"
+                aria-label={`${openCount} von ${items.length} offen`}
+              >
+                {openCount}/{items.length}
               </span>
             ) : (
               <span />
             )}
-            {(note.updated || note.created) && (
-              <p className="text-[11px] text-[var(--text-muted)]">
-                {formatRelative(note.updated || note.created)}
-              </p>
+            {note.is_shared && (
+              <span role="img" aria-label="Geteilt" title="Geteilt">
+                <Users className="w-3.5 h-3.5 text-primary/80" />
+              </span>
             )}
           </div>
         )}

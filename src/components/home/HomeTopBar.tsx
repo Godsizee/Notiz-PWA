@@ -127,7 +127,8 @@ export default function HomeTopBar({ searchQuery, onSearchChange }: HomeTopBarPr
               <X className="h-5 w-5" />
             </button>
           ) : (
-            <Search className="mr-1 h-5 w-5 shrink-0 text-[var(--text-muted)]" aria-hidden="true" />
+            // Unter 384 px braucht das Feld den Platz fuer den Platzhalter.
+            <Search className="mr-1 hidden h-5 w-5 shrink-0 text-[var(--text-muted)] xs:block" aria-hidden="true" />
           )}
 
           {/* Sync / offline status — becomes a dismiss button once there are
