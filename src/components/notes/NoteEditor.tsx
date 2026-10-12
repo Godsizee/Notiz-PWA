@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { RecordModel } from 'pocketbase';
 import { pb, isOwnedByMe } from '@/lib/pb';
-import { Palette, Pin, Archive, Trash2, Check, ExternalLink, RefreshCw, Users, Plus, MoreVertical, Camera, Images, ClipboardPaste } from 'lucide-react';
+import { Palette, Pin, Archive, Trash2, Check, ExternalLink, RefreshCw, Users, Plus, MoreVertical, Camera, Images, ClipboardPaste, ListChecks, Copy, Share2, ClipboardCopy } from 'lucide-react';
 import { getNoteColorStyles, NOTE_COLORS } from '@/lib/colors';
 import { applyChange, newRecordId } from '@/lib/sync';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -14,6 +14,8 @@ import NoteImageGallery from '@/components/notes/NoteImageGallery';
 import ImageViewer from '@/components/notes/ImageViewer';
 import { NoteTopBar, NoteBottomBar, BarButton } from '@/components/notes/NoteBars';
 import { useEscapeKey } from '@/lib/useEscapeKey';
+import { convertTextToChecklist } from '@/lib/convertNote';
+import { noteToShareText } from '@/lib/noteText';
 
 interface NoteEditorProps {
   note?: RecordModel | null; // null if creating a new note
@@ -27,11 +29,15 @@ interface NoteEditorProps {
   onCreated?: (id: string) => void;
   /** Notiz wurde ueber die Leiste (un)archiviert und gleich geschlossen — HomeScreen zeigt die Snackbar. */
   onArchived?: (id: string, archived: boolean) => void;
+  /** Notiz wurde in eine Liste umgewandelt — HomeScreen startet den Listen-Editor. */
+  onConverted?: (note: RecordModel) => void;
+  /** Kopie anlegen (HomeScreen kennt duplicateNote samt Snackbar). */
+  onDuplicate?: (note: RecordModel) => void;
   /** When provided, deleting routes through the app's soft-delete + undo toast. */
   onRequestDelete?: (noteId: string) => void;
 }
 
-export default function NoteEditor({ note, imagesByNote, onClose, onCreated, onArchived, onRequestDelete }: NoteEditorProps) {
+export default function NoteEditor({ note, imagesByNote, onClose, onCreated, onArchived, onConverted, onDuplicate, onRequestDelete }: NoteEditorProps) {
   const [title, setTitle] = useState(note?.title || '');
   const [content, setContent] = useState(note?.content || '');
   const [color, setColor] = useState(note?.color || 'white');
@@ -105,11 +111,15 @@ export default function NoteEditor({ note, imagesByNote, onClose, onCreated, onA
     []
   );
 
+  // Nach einer Umwandlung darf dieser Editor nichts mehr schreiben: performSave
+  // wuerde `type` zurueckdrehen, die Ghost-Bereinigung die Notiz loeschen.
+  const persistLockedRef = useRef(false);
+
   // Ghost-Note-Cleanup: delete silently if closed while completely empty
   useEffect(() => {
     return () => {
       const id = activeNoteIdRef.current;
-      if (id && isEmptyNote()) {
+      if (!persistLockedRef.current && id && isEmptyNote()) {
         applyChange({ collection: 'notes', action: 'delete', id }).catch(() => {});
       }
     };
@@ -171,6 +181,7 @@ export default function NoteEditor({ note, imagesByNote, onClose, onCreated, onA
   }, [newNoteData]);
 
   const performSave = useCallback(async () => {
+    if (persistLockedRef.current) return;
     const id = activeNoteIdRef.current;
     // Nothing meaningful to persist — also avoids racing the ghost-note
     // cleanup, which deletes an emptied note on close instead. An image-only
@@ -272,6 +283,67 @@ export default function NoteEditor({ note, imagesByNote, onClose, onCreated, onA
     void performSave();
     onArchived?.(id, next);
     onClose();
+  };
+
+  // --- Umwandeln, Teilen, Kopieren, Duplizieren (Mehr-Menue) ---
+
+  const flushPendingSave = async () => {
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    await performSave();
+  };
+
+  const handleConvertToChecklist = async () => {
+    closePopovers();
+    if (!window.confirm('In eine Liste umwandeln? Jede Zeile wird ein Eintrag.')) return;
+    try {
+      // Eine neue, noch nie gespeicherte Notiz braucht erst eine ID.
+      const id = await ensureNoteId();
+      // Letzte Eingaben sichern, dann jedes weitere Schreiben dieses Editors sperren.
+      await flushPendingSave();
+      persistLockedRef.current = true;
+      const updated = await convertTextToChecklist(id, contentRef.current);
+      onConverted?.({ ...updated, title: titleRef.current || updated.title } as RecordModel);
+    } catch (err) {
+      persistLockedRef.current = false;
+      console.error('Failed to convert note:', err);
+      showToast({ message: 'Umwandeln fehlgeschlagen.', tone: 'danger', duration: 3500 });
+    }
+  };
+
+  const shareText = () => noteToShareText(titleRef.current, contentRef.current, null);
+
+  const handleCopyText = async () => {
+    closePopovers();
+    try {
+      await navigator.clipboard.writeText(shareText());
+      showToast({ message: 'Text kopiert', duration: 2500 });
+    } catch {
+      showToast({ message: 'Kopieren nicht möglich.', tone: 'danger', duration: 3500 });
+    }
+  };
+
+  const handleShareText = async () => {
+    closePopovers();
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: titleRef.current || undefined, text: shareText() });
+      } catch {
+        // abgebrochen
+      }
+    } else {
+      await handleCopyText();
+    }
+  };
+
+  const handleDuplicateNote = async () => {
+    closePopovers();
+    await flushPendingSave();
+    const id = activeNoteIdRef.current;
+    if (!id || !onDuplicate) return;
+    onDuplicate({ ...(note ?? {}), id, type: 'text', title: titleRef.current, content: contentRef.current, color: colorRef.current } as RecordModel);
   };
 
   // Titel in der oberen Leiste erst zeigen, wenn der grosse Titel weggescrollt ist.
@@ -500,6 +572,9 @@ export default function NoteEditor({ note, imagesByNote, onClose, onCreated, onA
         ? `Bearbeitet ${lastSavedAt}`
         : 'Gespeichert';
 
+  const menuItemClass =
+    'flex items-center gap-2.5 px-3 py-3 rounded-xl text-sm font-semibold text-[var(--text-secondary)] hover:bg-[var(--background)]/80 transition-colors cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed';
+
   // Untere Leiste rechts: Mehr-Menue (Popover geht nach oben auf).
   const bottomTrailing = (
     <>
@@ -520,6 +595,29 @@ export default function NoteEditor({ note, imagesByNote, onClose, onCreated, onA
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
             className="absolute bottom-full right-2 mb-2 z-30 bg-card border border-[var(--border-color)] shadow-2xl rounded-2xl p-2 flex flex-col gap-1 min-w-[200px]"
           >
+            {/* Bilder haengen an der Notiz, der Listen-Editor zeigt sie nicht: nicht umwandeln. */}
+            <button
+              onClick={handleConvertToChecklist}
+              disabled={images.length > 0}
+              title={images.length > 0 ? 'Notizen mit Bildern lassen sich nicht in eine Liste umwandeln' : undefined}
+              className={menuItemClass}
+            >
+              <ListChecks className="w-4 h-4 text-primary" />
+              <span>In Liste umwandeln</span>
+            </button>
+            <button onClick={handleDuplicateNote} disabled={!activeNoteId} className={menuItemClass}>
+              <Copy className="w-4 h-4 text-primary" />
+              <span>Duplizieren</span>
+            </button>
+            <button onClick={handleShareText} className={menuItemClass}>
+              <Share2 className="w-4 h-4 text-primary" />
+              <span>Teilen</span>
+            </button>
+            <button onClick={handleCopyText} className={menuItemClass}>
+              <ClipboardCopy className="w-4 h-4 text-primary" />
+              <span>Text kopieren</span>
+            </button>
+            <div className="h-px bg-[var(--border-color)] my-1 mx-2" />
             <button
               onClick={() => { setShowMoreMenu(false); handleDelete(); }}
               disabled={!canDelete}

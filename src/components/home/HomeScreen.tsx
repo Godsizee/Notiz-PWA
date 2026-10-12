@@ -32,7 +32,7 @@ import { useSelectionActive, useSelectionStore } from "@/store/useSelectionStore
 import { useSelectionHistory } from "@/lib/useSelectionHistory";
 import { motion } from "framer-motion";
 import { useNoteRoute } from "@/lib/useNoteRoute";
-import { adoptCreatedId, resolveSession, type SessionState } from "@/lib/noteRoute";
+import { adoptCreatedId, resolveSession, restartSession, type SessionState } from "@/lib/noteRoute";
 import { useMediaQuery, useScrollDirection } from "@/lib/useViewport";
 
 const UNDO_DELETE_MS = 5000;
@@ -155,6 +155,12 @@ export default function HomeScreen() {
   const openText = () => openNew("text");
   const openChecklist = () => openNew("checklist");
   const openNote = (note: RecordModel) => pushNote(note.id);
+
+  // Liste <-> Textnotiz umgewandelt: anderer Editor fuer dieselbe Notiz. Der neue
+  // Sitzungs-key erzwingt den frischen Mount (resolveSession aendert bei gleicher
+  // ID bewusst nichts).
+  const handleConverted = (note: RecordModel) =>
+    setSessionState(restartSession(note, () => `editor-${++sessionSeq.current}`));
 
   // Eine neue Notiz wurde zum ersten Mal gespeichert: ID in die Sitzung (damit
   // der Editor NICHT neu gemountet wird) und in die URL (Reload/Teilen-Link).
@@ -673,6 +679,8 @@ export default function HomeScreen() {
             onClose={closeNote}
             onCreated={handleCreated}
             onArchived={handleArchivedFromEditor}
+            onConverted={handleConverted}
+            onDuplicate={handleDuplicate}
             onRequestDelete={requestDeleteFromEditor}
           />
         ) : (
@@ -686,6 +694,8 @@ export default function HomeScreen() {
             onClose={closeNote}
             onCreated={handleCreated}
             onArchived={handleArchivedFromEditor}
+            onConverted={handleConverted}
+            onDuplicate={handleDuplicate}
             onRequestDelete={requestDeleteFromEditor}
           />
         )}

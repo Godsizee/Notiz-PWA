@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { RecordModel } from 'pocketbase';
 import { pb, isOwnedByMe } from '@/lib/pb';
-import { Palette, Pin, Archive, Trash2, Plus, X, CheckCircle2, Circle, Check, MoreVertical, RotateCcw, GripVertical, Users, ScanText, Camera, Images, ChevronDown } from 'lucide-react';
+import { Palette, Pin, Archive, Trash2, Plus, X, CheckCircle2, Circle, Check, MoreVertical, FileText, Copy, Share2, ClipboardCopy, RotateCcw, GripVertical, Users, ScanText, Camera, Images, ChevronDown } from 'lucide-react';
 import { useRealtimeChecklist } from '@/lib/useRealtime';
 import { applyChange, newRecordId, isAbortError } from '@/lib/sync';
 import { usePresence } from '@/lib/usePresence';
@@ -17,6 +17,8 @@ import { splitPastedItems } from '@/lib/checklistPaste';
 import { rankSuggestions } from '@/lib/suggestions';
 import { useItemHistory } from '@/lib/useItemHistory';
 import { itemKey } from '@/lib/scan/merge';
+import { convertChecklistToText } from '@/lib/convertNote';
+import { noteToShareText } from '@/lib/noteText';
 import ConfettiBurst from '@/components/ui/ConfettiBurst';
 import ScanSheet from '@/components/notes/ScanSheet';
 import { NoteTopBar, NoteBottomBar, BarButton } from '@/components/notes/NoteBars';
@@ -34,6 +36,10 @@ interface ChecklistEditorProps {
   onCreated?: (id: string) => void;
   /** Liste wurde ueber die Leiste (un)archiviert und gleich geschlossen — HomeScreen zeigt die Snackbar. */
   onArchived?: (id: string, archived: boolean) => void;
+  /** Liste wurde in eine Textnotiz umgewandelt — HomeScreen startet den Textnotiz-Editor. */
+  onConverted?: (note: RecordModel) => void;
+  /** Kopie anlegen (HomeScreen kennt duplicateNote samt Snackbar). */
+  onDuplicate?: (note: RecordModel) => void;
   /** When provided, deleting routes through the app's soft-delete + undo toast. */
   onRequestDelete?: (noteId: string) => void;
 }
@@ -293,7 +299,7 @@ const ActiveChecklistList = memo(function ActiveChecklistList({
   );
 });
 
-export default function ChecklistEditor({ note, onClose, onCreated, onArchived, onRequestDelete }: ChecklistEditorProps) {
+export default function ChecklistEditor({ note, onClose, onCreated, onArchived, onConverted, onDuplicate, onRequestDelete }: ChecklistEditorProps) {
   const [title, setTitle] = useState(note?.title || '');
   const [color, setColor] = useState(note?.color || 'white');
   const [isPinned, setIsPinned] = useState(note?.is_pinned || false);
@@ -373,11 +379,15 @@ export default function ChecklistEditor({ note, onClose, onCreated, onArchived, 
   useEffect(() => { isArchivedRef.current = isArchived; }, [isArchived]);
   useEffect(() => { isSharedRef.current = isShared; }, [isShared]);
 
+  // Nach einer Umwandlung darf dieser Editor nichts mehr schreiben: performSave
+  // wuerde `type` zurueckdrehen, die Ghost-Bereinigung die Notiz loeschen.
+  const persistLockedRef = useRef(false);
+
   // Ghost-Note-Cleanup: delete silently if closed with no title and no items
   useEffect(() => {
     return () => {
       const id = activeNoteIdRef.current;
-      if (id && !titleRef.current.trim() && itemsRef.current.length === 0) {
+      if (!persistLockedRef.current && id && !titleRef.current.trim() && itemsRef.current.length === 0) {
         applyChange({ collection: 'notes', action: 'delete', id }).catch(() => {});
       }
     };
@@ -434,6 +444,7 @@ export default function ChecklistEditor({ note, onClose, onCreated, onArchived, 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const performSave = useCallback(async () => {
+    if (persistLockedRef.current) return;
     const id = activeNoteIdRef.current;
     if (!id && !titleRef.current.trim()) return;
 
@@ -910,6 +921,82 @@ export default function ChecklistEditor({ note, onClose, onCreated, onArchived, 
     });
   };
 
+  // --- Umwandeln, Teilen, Kopieren, Duplizieren (Mehr-Menue) ---
+
+  // Aktueller Stand der Eintraege wie angezeigt: ohne vorgemerkt Geloeschte und
+  // mit noch nicht geschriebenen Haken.
+  const currentItems = (): RecordModel[] =>
+    itemsRef.current
+      .filter((i) => !pendingDeleteItemIdsRef.current.has(i.id))
+      .map((i) => {
+        const pending = togglingItemsRef.current[i.id];
+        return (pending ? { ...i, is_completed: pending.is_completed } : i) as RecordModel;
+      });
+
+  const flushPendingSave = async () => {
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    await performSave();
+  };
+
+  const handleConvertToText = async () => {
+    closePopovers();
+    const id = activeNoteIdRef.current;
+    if (!id) return;
+    if (!window.confirm('In eine Textnotiz umwandeln? Abgehakte Einträge werden zu "- [x]"-Zeilen.')) return;
+    // Letzte Eingaben sichern, dann jedes weitere Schreiben dieses Editors sperren.
+    await flushPendingSave();
+    persistLockedRef.current = true;
+    try {
+      const updated = await convertChecklistToText(id, currentItems());
+      onConverted?.({ ...updated, title: titleRef.current || updated.title } as RecordModel);
+    } catch (err) {
+      persistLockedRef.current = false;
+      console.error('Failed to convert checklist:', err);
+      notifyError('Umwandeln fehlgeschlagen.');
+    }
+  };
+
+  const shareText = () =>
+    noteToShareText(
+      titleRef.current,
+      '',
+      currentItems().map((i) => ({ text: String(i.text ?? ''), is_completed: !!i.is_completed, order: Number(i.order ?? 0) }))
+    );
+
+  const handleCopyText = async () => {
+    closePopovers();
+    try {
+      await navigator.clipboard.writeText(shareText());
+      showToast({ message: 'Text kopiert', duration: 2500 });
+    } catch {
+      notifyError('Kopieren nicht möglich.');
+    }
+  };
+
+  const handleShareText = async () => {
+    closePopovers();
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: titleRef.current || undefined, text: shareText() });
+      } catch {
+        // abgebrochen
+      }
+    } else {
+      await handleCopyText();
+    }
+  };
+
+  const handleDuplicateNote = async () => {
+    closePopovers();
+    await flushPendingSave();
+    const id = activeNoteIdRef.current;
+    if (!id || !onDuplicate) return;
+    onDuplicate({ ...(note ?? {}), id, type: 'checklist', title: titleRef.current, color: colorRef.current, content: '' } as RecordModel);
+  };
+
   // Offline gar nicht erst fotografieren lassen: der Scan braucht Netz, und
   // ein Foto, das danach verworfen wird, ist verschwendete Muehe.
   const pickScanPhoto = (source: 'camera' | 'gallery') => {
@@ -1145,6 +1232,9 @@ export default function ChecklistEditor({ note, onClose, onCreated, onArchived, 
         ? `Bearbeitet ${lastSavedAt}`
         : 'Gespeichert';
 
+  const menuItemClass =
+    'flex items-center gap-2.5 px-3 py-3 rounded-xl text-sm font-semibold text-[var(--text-secondary)] hover:bg-[var(--background)]/80 transition-colors cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed';
+
   // Untere Leiste rechts: Mehr-Menue (Popover geht nach oben auf).
   const bottomTrailing = (
     <>
@@ -1190,6 +1280,24 @@ export default function ChecklistEditor({ note, onClose, onCreated, onArchived, 
             >
               <Trash2 className="w-4 h-4 text-red-500" />
               <span>Abgehakte löschen</span>
+            </button>
+
+            <div className="h-px bg-[var(--border-color)] my-1 mx-2" />
+            <button onClick={handleConvertToText} disabled={!activeNoteId} className={menuItemClass}>
+              <FileText className="w-4 h-4 text-primary" />
+              <span>In Textnotiz umwandeln</span>
+            </button>
+            <button onClick={handleDuplicateNote} disabled={!activeNoteId} className={menuItemClass}>
+              <Copy className="w-4 h-4 text-primary" />
+              <span>Duplizieren</span>
+            </button>
+            <button onClick={handleShareText} className={menuItemClass}>
+              <Share2 className="w-4 h-4 text-primary" />
+              <span>Als Text teilen</span>
+            </button>
+            <button onClick={handleCopyText} className={menuItemClass}>
+              <ClipboardCopy className="w-4 h-4 text-primary" />
+              <span>Text kopieren</span>
             </button>
 
             <div className="h-px bg-[var(--border-color)] my-1 mx-2" />
