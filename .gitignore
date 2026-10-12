@@ -18,13 +18,6 @@
 /out/
 /build
 
-# next-pwa generated service worker (rebuilt on every `next build`)
-/public/sw.js
-/public/workbox-*.js
-/public/swe-worker-*.js
-/public/worker-*.js
-/public/fallback-*.js
-
 # env files — .env.example ist die dokumentierte Vorlage und gehoert ins Repo
 .env*
 !.env.example

@@ -1,8 +1,6 @@
-// Custom service worker addition, bundled and imported into the generated
-// Workbox service worker via next-pwa's customWorkerSrc mechanism (see
-// next.config.mjs — this file lives at the default "worker/index.js" path,
-// no extra config needed). It runs in the SW's global scope alongside the
-// auto-generated precaching/fetch logic.
+// Eigene Service-Worker-Handler, importiert von src/app/sw.ts vor Serwist,
+// damit der Share-Target-POST beantwortet ist, bevor Serwists Router ihn sieht.
+// Sie laufen im globalen SW-Scope neben dem generierten Precaching.
 //
 // This only adds a Background Sync handler so the offline write queue can
 // flush even while the PWA is fully closed, on browsers that support the
@@ -26,12 +24,12 @@ import {
   blobGet,
   blobPut,
   blobDelete,
-} from '../src/lib/offlineDb';
-import { BACKGROUND_SYNC_TAG, PENDING_SHARE_KEY } from '../src/lib/syncTag';
+} from '../lib/offlineDb';
+import { BACKGROUND_SYNC_TAG, PENDING_SHARE_KEY } from '../lib/syncTag';
 
-// Mirrors the fallback in src/lib/pb.ts — this SW bundle has no access to
-// build-time env vars, and the backend URL is not expected to change often.
-const PB_URL = 'https://pbnote.dasdann.jetzt';
+// Per esbuild-`define` zur Buildzeit eingesetzt (src/app/serwist/[path]/route.ts).
+// Frueher stand hier die Produktions-URL des Autors als Literal.
+const PB_URL = process.env.NEXT_PUBLIC_POCKETBASE_URL;
 
 // `body` is either a plain object (sent as JSON) or a FormData (sent as
 // multipart). For multipart the Content-Type header must be omitted entirely

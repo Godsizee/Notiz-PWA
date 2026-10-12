@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { SerwistProvider } from "@serwist/turbopack/react";
 import "./globals.css";
 import PwaUpdateReload from "@/components/PwaUpdateReload";
 import PwaFullscreen from "@/components/PwaFullscreen";
@@ -71,11 +72,20 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className="antialiased safe-x">
-        <PwaUpdateReload />
-        <PwaFullscreen />
-        <div className="mx-auto max-w-4xl relative min-h-screen">
-          {children}
-        </div>
+        {/* reloadOnOnline aus: ein erzwungener Reload bei Netzrueckkehr wirft
+            einen offenen Editor weg — Realtime und Offline-Queue erledigen den
+            Wiederanlauf ohnehin. Im Dev-Modus kein SW, wie bisher. */}
+        <SerwistProvider
+          swUrl="/serwist/sw.js"
+          disable={process.env.NODE_ENV === "development"}
+          reloadOnOnline={false}
+        >
+          <PwaUpdateReload />
+          <PwaFullscreen />
+          <div className="mx-auto max-w-4xl relative min-h-screen">
+            {children}
+          </div>
+        </SerwistProvider>
       </body>
     </html>
   );

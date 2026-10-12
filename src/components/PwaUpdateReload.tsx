@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-// next-pwa's generated service worker calls skipWaiting(), so a new SW takes
+// Serwist (src/app/sw.ts) ruft skipWaiting() auf, so a new SW takes
 // control silently in the background after a deploy. Without this, an
 // already-open/resumed tab keeps running the old JS bundle, which can fail
 // to load chunks the new deploy removed — the page gets stuck on its initial
