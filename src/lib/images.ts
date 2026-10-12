@@ -78,10 +78,18 @@ function scaledSize(width: number, height: number, maxEdge: number) {
   };
 }
 
+interface CropRect {
+  sx: number;
+  sy: number;
+  sw: number;
+  sh: number;
+}
+
 function drawTo(
   source: CanvasImageSource,
   width: number,
-  height: number
+  height: number,
+  options: { crop?: CropRect; background?: string } = {}
 ): HTMLCanvasElement | OffscreenCanvas {
   const canvas =
     typeof OffscreenCanvas === 'function'
@@ -95,7 +103,14 @@ function drawTo(
   if (!ctx) throw new ImageDecodeError('Canvas nicht verfügbar.');
 
   ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(source, 0, 0, width, height);
+  // JPEG kennt keine Transparenz: ohne Untergrund wird sie schwarz.
+  if (options.background) {
+    ctx.fillStyle = options.background;
+    ctx.fillRect(0, 0, width, height);
+  }
+  const { crop } = options;
+  if (crop) ctx.drawImage(source, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, width, height);
+  else ctx.drawImage(source, 0, 0, width, height);
   return canvas;
 }
 
@@ -219,31 +234,99 @@ const SCAN_MAX_EDGE = 2048;
 const SCAN_MIN_EDGE = 400;
 
 /**
- * Prepare a photo for the shopping-list scan (src/lib/scan/client.ts).
+ * Ab diesem Seitenverhaeltnis (lang : kurz) kommt ein Bild fuer die Zerlegung in
+ * Ausschnitte in Frage: ein 20:9-Screenshot (2,2) bleibt ganz, ein langer
+ * Scroll-Screenshot nicht.
+ */
+const SCAN_SLICE_ASPECT = 2.4;
+/**
+ * Und nur, wenn das Verkleinern auf SCAN_MAX_EDGE die Schrift spuerbar schrumpfen
+ * liesse (Faktor unter diesem Wert). Ein 4000 x 3000-Foto wird weiter einfach
+ * verkleinert, es ist ja nicht lang.
+ */
+const SCAN_SLICE_MIN_SCALE = 0.75;
+/** Ueberlappung der Ausschnitte, damit keine Zeile in der Naht zerschnitten wird. */
+const SCAN_SLICE_OVERLAP = Math.round(SCAN_MAX_EDGE * 0.04);
+/** Noch staerker verkleinert ist die Schrift eines Handy-Screenshots nicht mehr sicher lesbar. */
+const SCAN_SLICE_FLOOR_SCALE = 0.5;
+
+/**
+ * Wie ein Bild fuer den Scan zerlegt wird (Rechtecke im Quellbild). Meist ein
+ * einziges Rechteck, das ganze Bild. Ein sehr langer Screenshot (Rezept per
+ * Scroll-Aufnahme, 1080 x 7000) wuerde auf 2048 px Hoehe zu ~300 px Breite
+ * schrumpfen und waere unlesbar; stattdessen wird er in bis zu `maxSlices`
+ * leicht ueberlappende Abschnitte geschnitten, die jeweils fast unskaliert
+ * bleiben. Die Abschnitte gehen als zusammengehoerige Bilder an den Workflow;
+ * Zeilen aus der Ueberlappung erscheinen doppelt und fallen als "doppelt auf dem
+ * Foto" in der Pruefansicht raus (merge.ts, duplicate_scan).
+ */
+export function planScanSlices(width: number, height: number, maxSlices: number): CropRect[] {
+  const whole: CropRect[] = [{ sx: 0, sy: 0, sw: width, sh: height }];
+  const horizontal = width > height;
+  const long = horizontal ? width : height;
+  const short = horizontal ? height : width;
+  const wholeScale = Math.min(1, SCAN_MAX_EDGE / long);
+  if (maxSlices < 2 || long / short < SCAN_SLICE_ASPECT || wholeScale >= SCAN_SLICE_MIN_SCALE) return whole;
+
+  const wanted = Math.ceil((long - SCAN_SLICE_OVERLAP) / (SCAN_MAX_EDGE - SCAN_SLICE_OVERLAP));
+  const count = Math.min(Math.max(wanted, 2), maxSlices);
+  const sliceLength = Math.ceil((long + (count - 1) * SCAN_SLICE_OVERLAP) / count);
+  if (SCAN_MAX_EDGE / sliceLength < SCAN_SLICE_FLOOR_SCALE) {
+    throw new ImageDecodeError(
+      'Der Screenshot ist zu lang, um ihn sicher zu lesen. Bitte lade ihn in mehreren Teilen hoch.'
+    );
+  }
+
+  const step = (long - sliceLength) / (count - 1);
+  return Array.from({ length: count }, (_, i) => {
+    const start = Math.round(i * step);
+    const length = Math.min(sliceLength, long - start);
+    return horizontal
+      ? { sx: start, sy: 0, sw: length, sh: height }
+      : { sx: 0, sy: start, sw: width, sh: length };
+  });
+}
+
+/**
+ * Prepare a photo or screenshot for the shopping-list scan
+ * (src/lib/scan/client.ts). Usually one blob; a very long screenshot comes back
+ * as up to `maxSlices` blobs (see planScanSlices).
  *
  * Unlike processImage() this always re-encodes as JPEG: Safari's canvas
  * silently returns PNG when asked for WebP on older versions, and a 1568-px
  * PNG of a handwritten note is several MB. Quality 0.88 keeps pencil strokes
  * readable — heavier compression is exactly what makes handwriting illegible.
+ * Transparent PNGs (screenshots shared from some apps) get a white backdrop.
  */
-export async function prepareScanImage(file: File | Blob): Promise<Blob> {
+export async function prepareScanImages(file: File | Blob, maxSlices = 1): Promise<Blob[]> {
   if (file.size > MAX_INPUT_BYTES) {
     throw new ImageTooLargeError('Bild ist größer als 25 MB.');
   }
 
   const source = await decode(file);
-  const width = Number(source.width);
-  const height = Number(source.height);
-  if (!width || !height) {
-    throw new ImageDecodeError('Bild hat keine lesbaren Abmessungen.');
-  }
-  if (Math.max(width, height) < SCAN_MIN_EDGE) {
+  const release = () => {
     if ('close' in source && typeof source.close === 'function') source.close();
-    throw new ImageDecodeError('Das Foto ist zu klein, um Text darauf zu lesen.');
-  }
+  };
+  try {
+    const width = Number(source.width);
+    const height = Number(source.height);
+    if (!width || !height) {
+      throw new ImageDecodeError('Bild hat keine lesbaren Abmessungen.');
+    }
+    if (Math.max(width, height) < SCAN_MIN_EDGE) {
+      throw new ImageDecodeError('Das Foto ist zu klein, um Text darauf zu lesen.');
+    }
 
-  const target = scaledSize(width, height, SCAN_MAX_EDGE);
-  const blob = await encode(drawTo(source, target.width, target.height), 'image/jpeg', 0.88);
-  if ('close' in source && typeof source.close === 'function') source.close();
-  return blob;
+    const blobs: Blob[] = [];
+    // Nacheinander: jede Leinwand ist bis zu 2048 px gross.
+    for (const crop of planScanSlices(width, height, maxSlices)) {
+      const target = scaledSize(crop.sw, crop.sh, SCAN_MAX_EDGE);
+      blobs.push(
+        await encode(drawTo(source, target.width, target.height, { crop, background: '#ffffff' }), 'image/jpeg', 0.88)
+      );
+    }
+    return blobs;
+  } finally {
+    release();
+  }
 }

@@ -1191,10 +1191,10 @@ export default function ChecklistEditor({ note, onClose, onCreated, onArchived, 
               className="flex items-center gap-2.5 px-3 py-3 rounded-xl text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--background)]/80 transition-colors cursor-pointer text-left"
             >
               <Images className="w-4 h-4 text-primary" />
-              <span>Zettel aus Galerie</span>
+              <span>Foto oder Screenshot aus Galerie</span>
             </button>
             <p className="px-3 pb-1 text-[11px] leading-snug text-[var(--text-muted)]">
-              Funktioniert mit Einkaufszetteln und Rezepten. Das Foto wird zur Texterkennung an Claude (Anthropic) übertragen und nicht in der App gespeichert.
+              Funktioniert mit Einkaufszetteln und Rezepten, auch als Screenshot. Das Bild wird zur Texterkennung an Claude (Anthropic) übertragen und nicht in der App gespeichert.
             </p>
           </motion.div>
         )}
@@ -1266,7 +1266,14 @@ export default function ChecklistEditor({ note, onClose, onCreated, onArchived, 
               className="flex items-center gap-2.5 px-3 py-3 rounded-xl text-sm font-semibold text-[var(--text-secondary)] hover:bg-[var(--background)]/80 transition-colors cursor-pointer text-left"
             >
               <ScanText className="w-4 h-4 text-primary" />
-              <span>Zettel oder Rezept scannen</span>
+              <span>Zettel oder Rezept fotografieren</span>
+            </button>
+            <button
+              onClick={() => pickScanPhoto('gallery')}
+              className="flex items-center gap-2.5 px-3 py-3 rounded-xl text-sm font-semibold text-[var(--text-secondary)] hover:bg-[var(--background)]/80 transition-colors cursor-pointer text-left"
+            >
+              <Images className="w-4 h-4 text-primary" />
+              <span>Foto oder Screenshot aus Galerie</span>
             </button>
             <div className="h-px bg-[var(--border-color)] my-1 mx-2" />
 
@@ -1444,7 +1451,7 @@ export default function ChecklistEditor({ note, onClose, onCreated, onArchived, 
                   <Images className="w-4 h-4 text-primary" /> Aus Galerie
                 </button>
                 <p className="w-full text-[11px] leading-snug text-[var(--text-muted)]">
-                  Funktioniert mit Einkaufszetteln und Rezepten. Das Foto wird zur Texterkennung an Claude (Anthropic) übertragen und nicht in der App gespeichert.
+                  Funktioniert mit Einkaufszetteln und Rezepten, auch als Screenshot. Das Bild wird zur Texterkennung an Claude (Anthropic) übertragen und nicht in der App gespeichert.
                 </p>
               </div>
             </motion.div>

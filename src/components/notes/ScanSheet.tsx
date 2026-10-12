@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle, CheckCircle2, Circle, Camera, RotateCcw, X, Loader2 } from 'lucide-react';
 import type { RecordModel } from 'pocketbase';
-import { prepareScanImage } from '@/lib/images';
+import { prepareScanImages } from '@/lib/images';
 import { requestScan, ScanError } from '@/lib/scan/client';
 import { existingForScan, planMerge, type MergeRow, type MergeReason } from '@/lib/scan/merge';
 import type { ScanResult } from '@/lib/scan/result';
@@ -125,8 +125,12 @@ export default function ScanSheet({ files, existingItems, onClose, onCommit, onR
     (async () => {
       try {
         const blobs: Blob[] = [];
-        for (const file of files.slice(0, MAX_FILES)) {
-          blobs.push(await prepareScanImage(file));
+        const picked = files.slice(0, MAX_FILES);
+        for (const [index, file] of picked.entries()) {
+          // Ein sehr langer Screenshot darf in mehrere Bilder zerlegt werden, aber
+          // jeder noch folgenden Datei bleibt ein Platz frei.
+          const room = MAX_FILES - blobs.length - (picked.length - 1 - index);
+          blobs.push(...(await prepareScanImages(file, room)));
           if (cancelled) return;
         }
         blobsRef.current = blobs;
