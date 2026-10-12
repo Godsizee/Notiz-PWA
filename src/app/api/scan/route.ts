@@ -31,6 +31,8 @@ const MAX_EXISTING_JSON_CHARS = 40_000;
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 const MAX_REQUEST_BYTES = MAX_IMAGES * MAX_IMAGE_BYTES + 64 * 1024;
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+// Die Sitzungspruefung ist ein einzelner kurzer Aufruf; haengt sie, ist PocketBase nicht erreichbar.
+const AUTH_TIMEOUT_MS = 15_000;
 // n8n: 45 s Timeout x 2 Versuche + 2 s Pause = 92 s im schlechtesten Fall.
 const UPSTREAM_TIMEOUT_MS = 100_000;
 
@@ -90,20 +92,37 @@ function rateLimited(userId: string): boolean {
   return entry.count > RATE_LIMIT_MAX_SCANS;
 }
 
+type AuthResult = { userId: string } | { reason: "unauthenticated" | "unreachable" };
+
 // Der Client schickt pb.authStore.token im Authorization-Header (nicht das
 // Cookie): Header-Auth ist nicht per CSRF ausnutzbar. authRefresh() ist die
 // einzige Pruefung, die PocketBase selbst die Signatur verifizieren laesst.
-async function authenticatedUserId(request: Request): Promise<string | null> {
+//
+// "Sitzung abgelaufen" nur, wenn PocketBase das Token wirklich ablehnt. Kommt gar
+// keine Antwort (Netzwerk, DNS, Timeout), ist das ein Serverproblem und darf den
+// Nutzer nicht zum erneuten Anmelden schicken — die Ursache steht im Log.
+async function authenticate(request: Request): Promise<AuthResult> {
   const token = request.headers.get("authorization")?.trim();
-  if (!token || !PB_URL) return null;
+  if (!token || !PB_URL) return { reason: "unauthenticated" };
   const pb = new PocketBase(PB_URL);
   pb.authStore.save(token);
   try {
-    const { record } = await pb.collection("users").authRefresh({ requestKey: null });
-    return record.id;
-  } catch {
-    return null;
+    const { record } = await pb.collection("users").authRefresh({ requestKey: null, signal: AbortSignal.timeout(AUTH_TIMEOUT_MS) });
+    return { userId: record.id };
+  } catch (err) {
+    const status = typeof (err as { status?: unknown })?.status === "number" ? (err as { status: number }).status : 0;
+    if (status === 400 || status === 401 || status === 403 || status === 404) return { reason: "unauthenticated" };
+    // Origin statt voller URL: ohne Pfad, damit nichts Unnoetiges im Log landet.
+    console.error(`[scan] PocketBase (${new URL(PB_URL).origin}) nicht erreichbar oder antwortet mit ${status || "Netzwerkfehler"}:`, causeOf(err));
+    return { reason: "unreachable" };
   }
+}
+
+function causeOf(err: unknown): string {
+  const e = err as { message?: unknown; originalError?: { cause?: { code?: unknown; message?: unknown }; message?: unknown } };
+  const cause = e?.originalError?.cause;
+  const parts = [e?.message, e?.originalError?.message, cause?.code, cause?.message].filter((p): p is string => typeof p === "string" && p !== "");
+  return parts.join(" | ") || "unbekannt";
 }
 
 export async function POST(request: Request) {
@@ -112,9 +131,9 @@ export async function POST(request: Request) {
     return fail(503, "scan_unavailable");
   }
 
-  const userId = await authenticatedUserId(request);
-  if (!userId) return fail(401, "unauthenticated");
-  if (rateLimited(userId)) return fail(429, "rate_limited");
+  const auth = await authenticate(request);
+  if ("reason" in auth) return auth.reason === "unreachable" ? fail(503, "scan_unavailable") : fail(401, "unauthenticated");
+  if (rateLimited(auth.userId)) return fail(429, "rate_limited");
 
   if (Number(request.headers.get("content-length") || 0) > MAX_REQUEST_BYTES) {
     return fail(413, "too_large");
@@ -179,6 +198,6 @@ export async function POST(request: Request) {
     );
   }
 
-  console.info(`[scan ${requestId}] user=${userId} items=${Array.isArray(body.items) ? body.items.length : "?"} meta=${JSON.stringify(body.meta ?? null)}`);
+  console.info(`[scan ${requestId}] user=${auth.userId} items=${Array.isArray(body.items) ? body.items.length : "?"} meta=${JSON.stringify(body.meta ?? null)}`);
   return NextResponse.json(body, { status: 200, headers: NO_STORE });
 }
