@@ -6,6 +6,7 @@ import { X, Pin, Palette, Archive, MoreVertical, Copy, Trash2, Check } from "luc
 import { BarButton } from "@/components/notes/NoteBars";
 import { NOTE_COLORS } from "@/lib/colors";
 import { useEscapeKey } from "@/lib/useEscapeKey";
+import { popoverTransition } from "@/lib/motion";
 
 interface SelectionBarProps {
   count: number;
@@ -45,7 +46,7 @@ export default function SelectionBar({
     initial: { opacity: 0, y: -8, scale: 0.96 },
     animate: { opacity: 1, y: 0, scale: 1 },
     exit: { opacity: 0, y: -8, scale: 0.96 },
-    transition: { duration: 0.15, ease: [0.2, 0, 0, 1] as [number, number, number, number] },
+    transition: popoverTransition,
   };
 
   return (

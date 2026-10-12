@@ -154,7 +154,10 @@ export default function HomeScreen() {
 
   const openText = () => openNew("text");
   const openChecklist = () => openNew("checklist");
-  const openNote = (note: RecordModel) => pushNote(note.id);
+  const openNote = (note: RecordModel) => {
+    hapticLight();
+    pushNote(note.id);
+  };
 
   // Liste <-> Textnotiz umgewandelt: anderer Editor fuer dieselbe Notiz. Der neue
   // Sitzungs-key erzwingt den frischen Mount (resolveSession aendert bei gleicher

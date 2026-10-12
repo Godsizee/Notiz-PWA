@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { springPage } from '@/lib/motion';
 
 // Vollbild-Ansicht einer geoeffneten Notiz. Ersetzt das fruehere Bottom-Sheet: kein
 // Hintergrund zum Danebentippen, kein Griff zum versehentlichen Wegziehen —
@@ -43,29 +44,43 @@ export default function NoteScreen({ open, layoutId, label, variant, children }:
     return () => root.classList.remove('note-open');
   }, [open, variant]);
 
+  return (
+    <AnimatePresence>
+      {open && (
+        <NoteSurface key="note-screen" layoutId={layoutId} label={label} variant={variant}>
+          {children}
+        </NoteSurface>
+      )}
+    </AnimatePresence>
+  );
+}
+
+function NoteSurface({ layoutId, label, variant, children }: Omit<NoteScreenProps, 'open'>) {
+  // Ob die Karte ins Vollbild morpht, wird beim Mounten festgelegt und bleibt
+  // so. Bei Deep-Link/Reload steht die ID erst nach dem Laden der Notizen fest,
+  // also mitten in der Eintrittsanimation; mit nachtraeglicher layoutId hing der
+  // Crossfade mit der Karte bei ~16 % Deckkraft fest und die Uebersicht
+  // schimmerte durch die Notiz.
+  const [morphId] = useState(variant === 'overlay' ? layoutId : undefined);
+
   const className =
     variant === 'overlay'
       ? 'fixed inset-0 z-50 flex flex-col bg-[var(--background)]'
       : 'relative z-10 flex h-full min-w-0 flex-col overflow-hidden bg-[var(--background)]';
 
   return (
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          key="note-screen"
-          role={variant === 'overlay' ? 'dialog' : 'region'}
-          aria-modal={variant === 'overlay' ? true : undefined}
-          aria-label={label}
-          layoutId={variant === 'overlay' ? layoutId : undefined}
-          initial={variant === 'overlay' && layoutId ? false : { opacity: 0, y: variant === 'overlay' ? 24 : 0 }}
-          animate={variant === 'overlay' && layoutId ? undefined : { opacity: 1, y: 0 }}
-          exit={{ opacity: 0 }}
-          transition={{ type: 'spring', damping: 32, stiffness: 320 }}
-          className={className}
-        >
-          {children}
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <motion.div
+      role={variant === 'overlay' ? 'dialog' : 'region'}
+      aria-modal={variant === 'overlay' ? true : undefined}
+      aria-label={label}
+      layoutId={morphId}
+      initial={morphId ? false : { opacity: 0, y: variant === 'overlay' ? 24 : 0 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0 }}
+      transition={springPage}
+      className={className}
+    >
+      {children}
+    </motion.div>
   );
 }

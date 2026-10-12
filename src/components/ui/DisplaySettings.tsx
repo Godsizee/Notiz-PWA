@@ -8,6 +8,7 @@ import { exportNotes, type ExportFormat } from "@/lib/exportNotes";
 import { useToastStore } from "@/store/useToastStore";
 import { hapticLight } from "@/lib/haptics";
 import { applyTheme, readTheme, type Theme } from "@/lib/theme";
+import { popoverTransition } from "@/lib/motion";
 
 const FONT_OPTIONS: { id: FontSize; label: string }[] = [
   { id: "sm", label: "S" },
@@ -137,7 +138,7 @@ export default function DisplaySettings({ userEmail, onLogout }: DisplaySettings
               initial={{ opacity: 0, y: -8, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -8, scale: 0.96 }}
-              transition={{ duration: 0.16 }}
+              transition={popoverTransition}
               className="absolute right-0 top-12 z-50 w-64 rounded-2xl surface p-3 shadow-[var(--shadow-elevated)]"
             >
               <DesignSection />

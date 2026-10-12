@@ -13,6 +13,7 @@ import { hapticLight, hapticHeavy } from '@/lib/haptics';
 import { parseQuantity } from '@/lib/quantities';
 import { useToastStore } from '@/store/useToastStore';
 import { useEscapeKey } from '@/lib/useEscapeKey';
+import { popoverTransition } from '@/lib/motion';
 import { splitPastedItems } from '@/lib/checklistPaste';
 import { rankSuggestions } from '@/lib/suggestions';
 import { useItemHistory } from '@/lib/useItemHistory';
@@ -1173,6 +1174,7 @@ export default function ChecklistEditor({ note, onClose, onCreated, onArchived, 
             initial={{ opacity: 0, y: 10, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            transition={popoverTransition}
             className="absolute bottom-full left-2 mb-2 z-30 bg-card border border-[var(--border-color)] shadow-2xl rounded-2xl p-2 flex flex-col gap-1 w-[min(18rem,calc(100vw-1rem))]"
           >
             <button
@@ -1201,6 +1203,7 @@ export default function ChecklistEditor({ note, onClose, onCreated, onArchived, 
             initial={{ opacity: 0, y: 10, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            transition={popoverTransition}
             className="absolute bottom-full left-2 mb-2 z-30 bg-[var(--card-bg)] border border-[var(--border-color)] shadow-[var(--shadow-elevated)] rounded-2xl p-3 flex flex-wrap gap-2 max-w-[min(18rem,calc(100vw-1rem))]"
           >
             {NOTE_COLORS.map(c => (
@@ -1253,6 +1256,7 @@ export default function ChecklistEditor({ note, onClose, onCreated, onArchived, 
             initial={{ opacity: 0, y: 10, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            transition={popoverTransition}
             className="absolute bottom-full right-2 mb-2 z-30 bg-card border border-[var(--border-color)] shadow-2xl rounded-2xl p-2 flex flex-col gap-1 min-w-[200px]"
           >
             <button

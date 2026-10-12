@@ -14,6 +14,7 @@ import NoteImageGallery from '@/components/notes/NoteImageGallery';
 import ImageViewer from '@/components/notes/ImageViewer';
 import { NoteTopBar, NoteBottomBar, BarButton } from '@/components/notes/NoteBars';
 import { useEscapeKey } from '@/lib/useEscapeKey';
+import { popoverTransition } from '@/lib/motion';
 import { convertTextToChecklist } from '@/lib/convertNote';
 import { noteToShareText } from '@/lib/noteText';
 import { continueListOnEnter, toggleBold, toggleLineMarker, type LineMarker, type TextEdit } from '@/lib/textFormat';
@@ -580,6 +581,7 @@ export default function NoteEditor({ note, imagesByNote, onClose, onCreated, onA
             initial={{ opacity: 0, y: 10, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            transition={popoverTransition}
             className="absolute bottom-full left-2 mb-2 z-30 bg-[var(--card-bg)] border border-[var(--border-color)] shadow-[var(--shadow-elevated)] rounded-2xl p-1.5 min-w-[11rem]"
           >
             <button
@@ -609,6 +611,7 @@ export default function NoteEditor({ note, imagesByNote, onClose, onCreated, onA
             initial={{ opacity: 0, y: 10, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            transition={popoverTransition}
             className="absolute bottom-full left-2 mb-2 z-30 bg-[var(--card-bg)] border border-[var(--border-color)] shadow-[var(--shadow-elevated)] rounded-2xl p-3 flex flex-wrap gap-2 max-w-[min(18rem,calc(100vw-1rem))]"
           >
             {NOTE_COLORS.map(c => (
@@ -661,6 +664,7 @@ export default function NoteEditor({ note, imagesByNote, onClose, onCreated, onA
             initial={{ opacity: 0, y: 10, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            transition={popoverTransition}
             className="absolute bottom-full right-2 mb-2 z-30 bg-card border border-[var(--border-color)] shadow-2xl rounded-2xl p-2 flex flex-col gap-1 min-w-[200px]"
           >
             {/* Bilder haengen an der Notiz, der Listen-Editor zeigt sie nicht: nicht umwandeln. */}
