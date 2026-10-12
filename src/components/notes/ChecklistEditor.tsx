@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { RecordModel } from 'pocketbase';
 import { pb, isOwnedByMe } from '@/lib/pb';
-import { Palette, Pin, Archive, Trash2, Plus, X, CheckCircle2, Circle, Check, RefreshCw, MoreVertical, RotateCcw, GripVertical, Users, ScanText, Camera, Images, ChevronDown } from 'lucide-react';
+import { Palette, Pin, Archive, Trash2, Plus, X, CheckCircle2, Circle, Check, MoreVertical, RotateCcw, GripVertical, Users, ScanText, Camera, Images, ChevronDown } from 'lucide-react';
 import { useRealtimeChecklist } from '@/lib/useRealtime';
 import { applyChange, newRecordId, isAbortError } from '@/lib/sync';
 import { usePresence } from '@/lib/usePresence';
@@ -12,8 +12,10 @@ import { motion, AnimatePresence, Reorder, useDragControls } from 'framer-motion
 import { hapticLight, hapticHeavy } from '@/lib/haptics';
 import { parseQuantity } from '@/lib/quantities';
 import { useToastStore } from '@/store/useToastStore';
+import { useEscapeKey } from '@/lib/useEscapeKey';
 import ConfettiBurst from '@/components/ui/ConfettiBurst';
 import ScanSheet from '@/components/notes/ScanSheet';
+import { NoteTopBar, NoteBottomBar, BarButton } from '@/components/notes/NoteBars';
 import { commitScanRows, undoScanCommit } from '@/lib/scan/commit';
 import type { MergeRow } from '@/lib/scan/merge';
 import type { ScanResult } from '@/lib/scan/result';
@@ -26,6 +28,8 @@ interface ChecklistEditorProps {
   onClose: () => void;
   /** Eine neue Liste wurde zum ersten Mal gespeichert (HomeScreen stellt die URL um). */
   onCreated?: (id: string) => void;
+  /** Liste wurde ueber die Leiste (un)archiviert und gleich geschlossen — HomeScreen zeigt die Snackbar. */
+  onArchived?: (id: string, archived: boolean) => void;
   /** When provided, deleting routes through the app's soft-delete + undo toast. */
   onRequestDelete?: (noteId: string) => void;
 }
@@ -285,7 +289,7 @@ const ActiveChecklistList = memo(function ActiveChecklistList({
   );
 });
 
-export default function ChecklistEditor({ note, onClose, onCreated, onRequestDelete }: ChecklistEditorProps) {
+export default function ChecklistEditor({ note, onClose, onCreated, onArchived, onRequestDelete }: ChecklistEditorProps) {
   const [title, setTitle] = useState(note?.title || '');
   const [color, setColor] = useState(note?.color || 'white');
   const [isPinned, setIsPinned] = useState(note?.is_pinned || false);
@@ -293,6 +297,8 @@ export default function ChecklistEditor({ note, onClose, onCreated, onRequestDel
   const [isShared, setIsShared] = useState(note?.is_shared || false);
   const [showPalette, setShowPalette] = useState(false);
   const [showBulkMenu, setShowBulkMenu] = useState(false);
+  const [showAddMenu, setShowAddMenu] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState('');
   const [activeNoteId, setActiveNoteId] = useState<string | undefined>(note?.id);
   const [newItemText, setNewItemText] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -372,7 +378,27 @@ export default function ChecklistEditor({ note, onClose, onCreated, onRequestDel
   }, []);
   const newItemInputRef = useRef<HTMLInputElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const itemInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  // Titel in der oberen Leiste erst zeigen, wenn der grosse Titel weggescrollt ist.
+  const [titleHidden, setTitleHidden] = useState(false);
+  useEffect(() => {
+    const el = titleInputRef.current;
+    const root = scrollRef.current;
+    if (!el || !root) return;
+    const io = new IntersectionObserver(([e]) => setTitleHidden(!e.isIntersecting), { root, threshold: 0 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  const closePopovers = () => {
+    setShowPalette(false);
+    setShowBulkMenu(false);
+    setShowAddMenu(false);
+  };
+  // Escape schliesst das offene Popover, nicht die Liste (useEscapeKey).
+  useEscapeKey(showPalette || showBulkMenu || showAddMenu, closePopovers);
 
   const registerRef = useCallback((id: string, el: HTMLInputElement | null) => {
     itemInputRefs.current[id] = el;
@@ -434,6 +460,7 @@ export default function ChecklistEditor({ note, onClose, onCreated, onRequestDel
         setActiveNoteId(record.id);
         onCreatedRef.current?.(record.id);
       }
+      setLastSavedAt(new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }));
     } catch (err) {
       console.error("Failed to auto-save checklist:", err);
     } finally {
@@ -723,6 +750,26 @@ export default function ChecklistEditor({ note, onClose, onCreated, onRequestDel
     onClose();
   };
 
+  // Archivieren schliesst die Liste (Keep-Verhalten); HomeScreen zeigt die
+  // Snackbar "Archiviert · Rueckgaengig".
+  const handleArchiveAndClose = () => {
+    const id = activeNoteIdRef.current;
+    if (!id) return;
+    const next = !isArchivedRef.current;
+    // performSave liest die Refs. Direkt speichern statt auf den Debounce zu
+    // hoffen: die Liste wird gleich unmountet, und das Flushen beim Unmount
+    // greift nur, wenn gerade ein Timer laeuft.
+    isArchivedRef.current = next;
+    setIsArchived(next);
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    void performSave();
+    onArchived?.(id, next);
+    onClose();
+  };
+
   // BULK ACTIONS
   const handleResetAll = async () => {
     setShowBulkMenu(false);
@@ -819,7 +866,7 @@ export default function ChecklistEditor({ note, onClose, onCreated, onRequestDel
   // ein Foto, das danach verworfen wird, ist verschwendete Muehe.
   const pickScanPhoto = (source: 'camera' | 'gallery') => {
     setShowScanMenu(false);
-    setShowBulkMenu(false);
+    closePopovers();
     if (!isOnline || !navigator.onLine) {
       showToast({ message: 'Der Foto-Scan braucht eine Internetverbindung.', duration: 3500 });
       return;
@@ -914,9 +961,200 @@ export default function ChecklistEditor({ note, onClose, onCreated, onRequestDel
   const canShare = isOwnedByMe(note);
   const canDelete = isOwnedByMe(note);
 
+  // Obere Leiste: Presence und die Zustands-Aktionen der Liste (wie in Keep).
+  const topActions = (
+    <>
+      {/* Realtime presence — wer gerade in dieser Liste ist */}
+      {others.length > 0 && (
+        <div role="group" aria-label="Bearbeitet gerade" className="mr-1.5 flex -space-x-2">
+          {others.map((p) => {
+            const email: string = p.expand?.user?.email || '?';
+            return (
+              <div
+                key={p.id}
+                title={`${email} bearbeitet gerade`}
+                className="w-7 h-7 rounded-full bg-gradient-to-tr from-primary to-purple-500 text-white flex items-center justify-center text-[11px] font-bold border border-[var(--card-bg)] shadow-sm"
+              >
+                {email[0]?.toUpperCase()}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <BarButton
+        label={canShare ? (isShared ? 'Nicht mehr teilen' : 'Mit Partner teilen') : 'Nur wer die Liste angelegt hat, kann das Teilen beenden'}
+        pressed={isShared}
+        disabled={!canShare}
+        onClick={() => setIsShared(!isShared)}
+      >
+        <Users size={20} />
+      </BarButton>
+      <BarButton label={isPinned ? 'Anpinnen aufheben' : 'Anpinnen'} pressed={isPinned} onClick={() => setIsPinned(!isPinned)}>
+        <Pin size={20} className={isPinned ? 'fill-current' : ''} />
+      </BarButton>
+      <BarButton
+        label={isArchived ? 'Aus dem Archiv holen' : 'Archivieren'}
+        pressed={isArchived}
+        disabled={!activeNoteId}
+        onClick={handleArchiveAndClose}
+      >
+        <Archive size={20} />
+      </BarButton>
+    </>
+  );
+
+  // Untere Leiste links: Hinzufuegen (Foto-Scan) und Farbe. Die Popover haengen
+  // an der Leiste selbst (sticky = Bezugsrahmen) und bleiben so ueber der
+  // Tastatur, auch wenn iOS die Leiste per Transform nach oben schiebt.
+  const bottomLeading = (
+    <>
+      <BarButton
+        label="Hinzufügen"
+        expanded={showAddMenu}
+        onClick={() => { const next = !showAddMenu; closePopovers(); setShowAddMenu(next); }}
+      >
+        <Plus size={22} />
+      </BarButton>
+      <BarButton
+        label="Farbe ändern"
+        expanded={showPalette}
+        onClick={() => { const next = !showPalette; closePopovers(); setShowPalette(next); }}
+      >
+        <Palette size={20} />
+      </BarButton>
+
+      <AnimatePresence>
+        {showAddMenu && (
+          <motion.div
+            key="add-menu"
+            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            className="absolute bottom-full left-2 mb-2 z-30 bg-card border border-[var(--border-color)] shadow-2xl rounded-2xl p-2 flex flex-col gap-1 w-[min(18rem,calc(100vw-1rem))]"
+          >
+            <button
+              onClick={() => pickScanPhoto('camera')}
+              className="flex items-center gap-2.5 px-3 py-3 rounded-xl text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--background)]/80 transition-colors cursor-pointer text-left"
+            >
+              <Camera className="w-4 h-4 text-primary" />
+              <span>Zettel fotografieren</span>
+            </button>
+            <button
+              onClick={() => pickScanPhoto('gallery')}
+              className="flex items-center gap-2.5 px-3 py-3 rounded-xl text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--background)]/80 transition-colors cursor-pointer text-left"
+            >
+              <Images className="w-4 h-4 text-primary" />
+              <span>Zettel aus Galerie</span>
+            </button>
+            <p className="px-3 pb-1 text-[11px] leading-snug text-[var(--text-muted)]">
+              Funktioniert mit Einkaufszetteln und Rezepten. Das Foto wird zur Texterkennung an Claude (Anthropic) übertragen und nicht in der App gespeichert.
+            </p>
+          </motion.div>
+        )}
+
+        {showPalette && (
+          <motion.div
+            key="palette"
+            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            className="absolute bottom-full left-2 mb-2 z-30 bg-[var(--card-bg)] border border-[var(--border-color)] shadow-[var(--shadow-elevated)] rounded-2xl p-3 flex flex-wrap gap-2 max-w-[min(18rem,calc(100vw-1rem))]"
+          >
+            {NOTE_COLORS.map(c => (
+              <button
+                key={c.id}
+                className="w-9 h-9 rounded-full border border-black/10 shadow-inner transition-transform hover:scale-110 relative flex items-center justify-center cursor-pointer"
+                style={{ backgroundColor: c.hex }}
+                onClick={() => { setColor(c.hex); setShowPalette(false); }}
+                title={c.label}
+                aria-label={c.label}
+                aria-pressed={color === c.hex}
+              >
+                {color === c.hex && (
+                  <Check className="w-4 h-4 text-slate-800" />
+                )}
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+
+  const statusText = isSaving
+    ? 'Speichert…'
+    : !isOnline
+      ? 'Lokal gespeichert'
+      : lastSavedAt
+        ? `Bearbeitet ${lastSavedAt}`
+        : 'Gespeichert';
+
+  // Untere Leiste rechts: Mehr-Menue (Popover geht nach oben auf).
+  const bottomTrailing = (
+    <>
+      <BarButton
+        label="Mehr"
+        expanded={showBulkMenu}
+        onClick={() => { const next = !showBulkMenu; closePopovers(); setShowBulkMenu(next); }}
+      >
+        <MoreVertical size={20} />
+      </BarButton>
+
+      <AnimatePresence>
+        {showBulkMenu && (
+          <motion.div
+            key="bulk-menu"
+            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            className="absolute bottom-full right-2 mb-2 z-30 bg-card border border-[var(--border-color)] shadow-2xl rounded-2xl p-2 flex flex-col gap-1 min-w-[200px]"
+          >
+            <button
+              onClick={() => pickScanPhoto('camera')}
+              className="flex items-center gap-2.5 px-3 py-3 rounded-xl text-sm font-semibold text-[var(--text-secondary)] hover:bg-[var(--background)]/80 transition-colors cursor-pointer text-left"
+            >
+              <ScanText className="w-4 h-4 text-primary" />
+              <span>Zettel oder Rezept scannen</span>
+            </button>
+            <div className="h-px bg-[var(--border-color)] my-1 mx-2" />
+
+            <button
+              onClick={handleResetAll}
+              disabled={completedItems.length === 0}
+              className="flex items-center gap-2.5 px-3 py-3 rounded-xl text-sm font-semibold text-[var(--text-secondary)] hover:bg-[var(--background)]/80 transition-colors cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <RotateCcw className="w-4 h-4 text-primary" />
+              <span>Alle Haken entfernen</span>
+            </button>
+
+            <button
+              onClick={handleDeleteCompleted}
+              disabled={completedItems.length === 0}
+              className="flex items-center gap-2.5 px-3 py-3 rounded-xl text-sm font-semibold text-red-500 hover:bg-red-500/5 transition-colors cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Trash2 className="w-4 h-4 text-red-500" />
+              <span>Abgehakte löschen</span>
+            </button>
+
+            <div className="h-px bg-[var(--border-color)] my-1 mx-2" />
+            <button
+              onClick={() => { setShowBulkMenu(false); handleDeleteNote(); }}
+              disabled={!canDelete}
+              title={canDelete ? undefined : 'Nur wer die Liste angelegt hat, kann sie löschen'}
+              className="flex items-center gap-2.5 px-3 py-3 rounded-xl text-sm font-semibold text-red-500 hover:bg-red-500/5 transition-colors cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Liste löschen</span>
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+
   return (
     <div
-      className="flex flex-col h-full min-h-[60vh] rounded-t-3xl transition-colors duration-300 relative"
+      className={`relative flex min-h-0 flex-1 flex-col transition-colors duration-300 ${colorStyles.bg}`}
       style={colorStyles.style}
     >
       {/* Micro-Delight: Konfetti, wenn der letzte offene Eintrag abgehakt wird */}
@@ -926,45 +1164,26 @@ export default function ChecklistEditor({ note, onClose, onCreated, onRequestDel
       <input ref={scanCameraRef} type="file" accept="image/*" capture="environment" onChange={onScanInputChange} className="hidden" />
       <input ref={scanGalleryRef} type="file" accept="image/*" multiple onChange={onScanInputChange} className="hidden" />
 
-      {/* Title Header */}
-      <div className="p-6 pb-2">
-        {/* Realtime presence — shows collaborators currently viewing this list */}
-        <AnimatePresence>
-          {others.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: -6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              className="flex items-center gap-2 mb-2"
-            >
-              <div className="flex -space-x-2">
-                {others.map((p) => {
-                  const email: string = p.expand?.user?.email || '?';
-                  return (
-                    <div
-                      key={p.id}
-                      title={`${email} bearbeitet gerade`}
-                      className="w-6 h-6 rounded-full bg-gradient-to-tr from-primary to-purple-500 text-white flex items-center justify-center text-[11px] font-bold border border-[var(--card-bg)] shadow-sm"
-                    >
-                      {email[0]?.toUpperCase()}
-                    </div>
-                  );
-                })}
-              </div>
-              <span className="flex items-center gap-1.5 text-[11px] font-bold text-green-500 uppercase tracking-wider">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                Bearbeitet gerade
-              </span>
-            </motion.div>
-          )}
-        </AnimatePresence>
+      <NoteTopBar
+        onBack={onClose}
+        title={title || 'Liste'}
+        showTitle={titleHidden}
+        scrollRef={scrollRef}
+        actions={topActions}
+      />
 
-        <div className="flex items-start gap-2">
+      {/* Checklist Body (Scrollable) — layoutScroll lets framer-motion offset
+          its layout measurements by this container's scroll position, so drag
+          targets stay accurate once the list has been scrolled. */}
+      <motion.div ref={scrollRef} layoutScroll className="flex-1 overflow-y-auto overscroll-contain px-5 pb-6 space-y-1">
+
+        {/* Title */}
+        <div className="pb-2 pt-1">
           <input
             ref={titleInputRef}
             type="text"
             placeholder="Titel der Liste"
-            className="min-w-0 flex-1 text-2xl font-extrabold bg-transparent border-none outline-none text-[var(--text-primary)] placeholder-[var(--text-muted)]/40"
+            className="w-full text-2xl font-extrabold bg-transparent border-none outline-none text-[var(--text-primary)] placeholder-[var(--text-muted)]/40"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={(e) => {
@@ -974,21 +1193,7 @@ export default function ChecklistEditor({ note, onClose, onCreated, onRequestDel
               }
             }}
           />
-          <button
-            onClick={onClose}
-            className="tap-target -mr-2 shrink-0 rounded-xl text-[var(--text-secondary)] hover:bg-[var(--background)]/80 cursor-pointer"
-            aria-label="Liste schließen"
-            title="Schließen"
-          >
-            <ChevronDown className="w-6 h-6" />
-          </button>
         </div>
-      </div>
-
-      {/* Checklist Body (Scrollable) — layoutScroll lets framer-motion offset
-          its layout measurements by this container's scroll position, so drag
-          targets stay accurate once the list has been scrolled. */}
-      <motion.div layoutScroll className="flex-1 overflow-y-auto px-6 space-y-1 pb-32">
 
         {/* Active Items list (reorderable) */}
         <ActiveChecklistList
@@ -1024,7 +1229,7 @@ export default function ChecklistEditor({ note, onClose, onCreated, onRequestDel
             }}
           />
           <button
-            onClick={() => { setShowScanMenu((v) => !v); setShowBulkMenu(false); setShowPalette(false); }}
+            onClick={() => { setShowScanMenu((v) => !v); closePopovers(); }}
             className={`tap-target-sm shrink-0 rounded-xl transition-colors cursor-pointer ${showScanMenu ? 'bg-primary/10 text-primary' : 'text-[var(--text-muted)] hover:text-primary'}`}
             aria-label="Einkaufszettel oder Rezept scannen"
             aria-expanded={showScanMenu}
@@ -1133,170 +1338,7 @@ export default function ChecklistEditor({ note, onClose, onCreated, onRequestDel
         )}
       </motion.div>
 
-      {/* Floating Design & Bulk Action Toolbar */}
-      <div
-        className="absolute bottom-4 left-3 right-3 sm:bottom-6 sm:left-6 sm:right-6 h-14 bg-[var(--card-bg)]/85 backdrop-blur-xl border border-[var(--border-color)] rounded-2xl shadow-[var(--shadow-elevated)] flex items-center justify-between px-2 sm:px-4 z-50"
-        style={{ marginBottom: "env(safe-area-inset-bottom)" }}
-      >
-
-        {/* Left Actions */}
-        <div className="flex items-center gap-1 sm:gap-3.5 relative">
-
-          <button
-            onClick={() => { setShowPalette(!showPalette); setShowBulkMenu(false); }}
-            className="w-10 h-10 xs:w-11 xs:h-11 rounded-xl hover:bg-[var(--background)]/80 flex items-center justify-center transition-colors text-[var(--text-secondary)] cursor-pointer"
-            title="Farbe ändern"
-            aria-label="Farbe ändern"
-            aria-expanded={showPalette}
-          >
-            <Palette size={19} />
-          </button>
-
-          <AnimatePresence>
-            {showPalette && (
-              <motion.div
-                initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                className="absolute bottom-16 left-0 bg-[var(--card-bg)] border border-[var(--border-color)] shadow-[var(--shadow-elevated)] rounded-2xl p-3 flex flex-wrap gap-2 max-w-[min(18rem,calc(100vw-1.5rem))] z-[60]"
-              >
-                {NOTE_COLORS.map(c => (
-                  <button
-                    key={c.id}
-                    className="w-7 h-7 rounded-full border border-black/10 shadow-inner transition-transform hover:scale-115 relative flex items-center justify-center cursor-pointer"
-                    style={{ backgroundColor: c.hex }}
-                    onClick={() => { setColor(c.hex); setShowPalette(false); }}
-                    title={c.label}
-                    aria-label={c.label}
-                    aria-pressed={color === c.hex}
-                  >
-                    {color === c.hex && (
-                      <Check className="w-4 h-4 text-slate-800" />
-                    )}
-                  </button>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          <div className="h-6 w-px bg-[var(--border-color)] mx-0.5"></div>
-
-          <button
-            onClick={() => setIsPinned(!isPinned)}
-            className={`w-10 h-10 xs:w-11 xs:h-11 rounded-xl flex items-center justify-center transition-colors cursor-pointer ${isPinned ? 'bg-primary/10 text-primary' : 'text-[var(--text-secondary)] hover:bg-[var(--background)]/80'}`}
-            title="Liste anpinnen"
-            aria-label="Liste anpinnen"
-            aria-pressed={isPinned}
-          >
-            <Pin size={19} className={isPinned ? 'fill-current' : ''} />
-          </button>
-
-          <button
-            onClick={() => setIsArchived(!isArchived)}
-            className={`w-10 h-10 xs:w-11 xs:h-11 rounded-xl flex items-center justify-center transition-colors cursor-pointer ${isArchived ? 'bg-orange-500/10 text-orange-500' : 'text-[var(--text-secondary)] hover:bg-[var(--background)]/80'}`}
-            title="Archivieren"
-            aria-label="Archivieren"
-            aria-pressed={isArchived}
-          >
-            <Archive size={19} />
-          </button>
-
-          <button
-            onClick={() => setIsShared(!isShared)}
-            disabled={!canShare}
-            className={`w-10 h-10 xs:w-11 xs:h-11 rounded-xl flex items-center justify-center transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${isShared ? 'bg-primary/10 text-primary' : 'text-[var(--text-secondary)] hover:bg-[var(--background)]/80'}`}
-            title={canShare
-              ? (isShared ? 'Nicht mehr teilen' : 'Mit Partner teilen')
-              : 'Nur wer die Liste angelegt hat, kann das Teilen beenden'}
-            aria-label={isShared ? 'Nicht mehr teilen' : 'Mit Partner teilen'}
-            aria-pressed={isShared}
-          >
-            <Users size={19} />
-          </button>
-        </div>
-
-        {/* Right Actions, Status & Bulk menu */}
-        <div className="flex items-center gap-1 sm:gap-3 relative">
-
-          {/* Save status — collapses to an icon on very narrow screens */}
-          <div className="hidden xs:flex items-center gap-1.5 text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider bg-[var(--background)]/50 px-2.5 py-1 rounded-full border border-[var(--border-color)]">
-            {isSaving ? (
-              <>
-                <RefreshCw className="w-3 h-3 animate-spin text-primary" />
-                <span>Speichert…</span>
-              </>
-            ) : (
-              <>
-                <Check className="w-3 h-3 text-green-500" />
-                <span>{isOnline ? 'Gespeichert' : 'Lokal gespeichert'}</span>
-              </>
-            )}
-          </div>
-
-          <div className="hidden xs:block h-6 w-px bg-[var(--border-color)] mx-0.5"></div>
-
-          <button
-            onClick={() => { setShowBulkMenu(!showBulkMenu); setShowPalette(false); }}
-            className={`w-10 h-10 xs:w-11 xs:h-11 rounded-xl hover:bg-[var(--background)]/80 flex items-center justify-center transition-colors cursor-pointer ${showBulkMenu ? 'bg-primary/10 text-primary' : 'text-[var(--text-secondary)]'}`}
-            title="Aktionen"
-            aria-label="Aktionen"
-            aria-haspopup="menu"
-            aria-expanded={showBulkMenu}
-          >
-            <MoreVertical size={19} />
-          </button>
-
-          <AnimatePresence>
-            {showBulkMenu && (
-              <motion.div
-                initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                className="absolute bottom-16 right-0 bg-card border border-[var(--border-color)] shadow-2xl rounded-2xl p-2 flex flex-col gap-1 z-[60] min-w-[200px]"
-              >
-                <button
-                  onClick={() => pickScanPhoto('camera')}
-                  className="flex items-center gap-2.5 px-3 py-3 rounded-xl text-sm font-semibold text-[var(--text-secondary)] hover:bg-[var(--background)]/80 transition-colors cursor-pointer text-left"
-                >
-                  <ScanText className="w-4 h-4 text-primary" />
-                  <span>Zettel oder Rezept scannen</span>
-                </button>
-                <div className="h-px bg-[var(--border-color)] my-1 mx-2" />
-
-                <button
-                  onClick={handleResetAll}
-                  disabled={completedItems.length === 0}
-                  className="flex items-center gap-2.5 px-3 py-3 rounded-xl text-sm font-semibold text-[var(--text-secondary)] hover:bg-[var(--background)]/80 transition-colors cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  <RotateCcw className="w-4 h-4 text-primary" />
-                  <span>Alle Haken entfernen</span>
-                </button>
-
-                <button
-                  onClick={handleDeleteCompleted}
-                  disabled={completedItems.length === 0}
-                  className="flex items-center gap-2.5 px-3 py-3 rounded-xl text-sm font-semibold text-red-500 hover:bg-red-500/5 transition-colors cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  <Trash2 className="w-4 h-4 text-red-500" />
-                  <span>Abgehakte löschen</span>
-                </button>
-
-                <div className="h-px bg-[var(--border-color)] my-1 mx-2" />
-                <button
-                  onClick={() => { setShowBulkMenu(false); handleDeleteNote(); }}
-                  disabled={!canDelete}
-                  title={canDelete ? undefined : 'Nur wer die Liste angelegt hat, kann sie löschen'}
-                  className="flex items-center gap-2.5 px-3 py-3 rounded-xl text-sm font-semibold text-red-500 hover:bg-red-500/5 transition-colors cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  <span>Liste löschen</span>
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-        </div>
-      </div>
+      <NoteBottomBar leading={bottomLeading} status={statusText} trailing={bottomTrailing} />
 
       <ScanSheet
         files={scanFiles}

@@ -170,6 +170,23 @@ export default function HomeScreen() {
     }
   };
 
+  // Der Editor hat die Notiz bereits (un)archiviert und sich geschlossen — hier
+  // nur die Snackbar mit Rueckgaengig.
+  const handleArchivedFromEditor = (id: string, archived: boolean) => {
+    showToast({
+      message: archived ? "Archiviert" : "Aus dem Archiv geholt",
+      actionLabel: "Rückgängig",
+      duration: UNDO_DELETE_MS,
+      onAction: () => {
+        hapticLight();
+        applyChange({ collection: "notes", action: "update", id, data: { is_archived: !archived } }).catch((err) => {
+          console.error("Failed to undo archive:", err);
+          notifyError("Rückgängig fehlgeschlagen.");
+        });
+      },
+    });
+  };
+
   const handleToggleShare = async (note: RecordModel) => {
     try {
       await applyChange({
@@ -481,6 +498,7 @@ export default function HomeScreen() {
             note={session.note}
             onClose={closeNote}
             onCreated={handleCreated}
+            onArchived={handleArchivedFromEditor}
             onRequestDelete={requestDeleteFromEditor}
           />
         ) : (
