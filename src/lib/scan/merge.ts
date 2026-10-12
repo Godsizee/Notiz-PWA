@@ -1,5 +1,5 @@
 import { parseQuantity } from '@/lib/quantities';
-import type { ScanItem, ScanUnit } from '@/lib/scan/result';
+import type { ScanItem, ScanSourceType, ScanUnit } from '@/lib/scan/result';
 
 const UNIT_PLURAL: Partial<Record<ScanUnit, string>> = {
   Packung: 'Packungen', Dose: 'Dosen', Flasche: 'Flaschen', Tafel: 'Tafeln', Tüte: 'Tüten',
@@ -16,6 +16,20 @@ export function formatItemText(item: Pick<ScanItem, 'name' | 'count' | 'unit' | 
   parts.push(item.name);
   const text = parts.join(' ');
   return (item.note ? `${text} (${item.note})` : text).slice(0, 120);
+}
+
+/**
+ * Text, der in die Liste geschrieben wird. Einkaufszettel kommen 1:1 so an, wie
+ * sie auf dem Foto stehen ("4 Milch", "2-3 Bananen", "18er Eier") — die Person
+ * entscheidet selbst, was sie daraus macht. Nur Rezepte werden in
+ * Einkaufsmengen umgerechnet ("500 g Mehl" → "1 Packung Mehl").
+ */
+export function itemText(item: ScanItem, sourceType: ScanSourceType): string {
+  if (sourceType === 'shopping_list') {
+    const raw = item.raw.trim();
+    if (raw) return raw.slice(0, 120);
+  }
+  return formatItemText(item);
 }
 
 /** Comparable key: no quantity, no "(…)" note, lowercase, umlauts folded. */
@@ -68,17 +82,25 @@ export interface ExistingItem {
  *  - checked off earlier            → reopen that item instead of adding a twin
  *  - everything else                → add, selected (low confidence is flagged)
  */
-export function planMerge(scanned: ScanItem[], existing: ExistingItem[]): MergeRow[] {
+export function planMerge(
+  scanned: ScanItem[],
+  existing: ExistingItem[],
+  sourceType: ScanSourceType = 'recipe'
+): MergeRow[] {
   const known = existing.map((e) => ({ ...e, key: itemKey(e.text) }));
   const seenKeys: string[] = [];
   const reopened = new Set<string>();
 
   return scanned.map((item, index) => {
     const key = itemKey(item.name);
-    const row: MergeRow = { rowId: `scan-${index}`, item, text: formatItemText(item), action: 'add', selected: true };
+    const row: MergeRow = { rowId: `scan-${index}`, item, text: itemText(item, sourceType), action: 'add', selected: true };
 
-    if (seenKeys.some((k) => sameItem(k, key))) return { ...row, selected: false, reason: 'duplicate_scan' };
-    seenKeys.push(key);
+    // Auf einem Zettel zaehlt nur dieselbe Zeile doppelt ("2 Haehnchenwurst B" und
+    // "4. Haehnchenwurst C" sind zwei Eintraege); bei Rezepten wird nach
+    // Produkt zusammengefasst. Gegen die offene Liste gilt immer das Produkt.
+    const scanKey = sourceType === 'shopping_list' ? itemKey(row.text) || key : key;
+    if (seenKeys.some((k) => sameItem(k, scanKey))) return { ...row, selected: false, reason: 'duplicate_scan' };
+    seenKeys.push(scanKey);
 
     if (known.some((e) => !e.is_completed && sameItem(e.key, key))) {
       return { ...row, selected: false, reason: 'duplicate_open' };

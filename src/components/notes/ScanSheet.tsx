@@ -91,7 +91,7 @@ export default function ScanSheet({ files, existingItems, onClose, onCommit, onR
         text: String(i.text ?? ''),
         is_completed: !!i.is_completed,
       }));
-      setRows(planMerge(result.items, existing));
+      setRows(planMerge(result.items, existing, result.sourceType));
       setPhase({ kind: 'review', result });
       hapticLight();
     } catch (err) {
@@ -250,7 +250,7 @@ export default function ScanSheet({ files, existingItems, onClose, onCommit, onR
                   <p className="max-w-xs text-sm text-[var(--text-secondary)]">
                     {phase.kind === 'scanning' && phase.slow
                       ? 'Dauert etwas länger als sonst. Du kannst abbrechen und es gleich noch einmal versuchen.'
-                      : 'Mengen werden dabei in Einkaufsmengen umgerechnet.'}
+                      : 'Einkaufszettel werden 1:1 übernommen, Rezepte in Einkaufsmengen umgerechnet.'}
                   </p>
                 </div>
               )}

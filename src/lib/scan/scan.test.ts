@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseQuantity } from '@/lib/quantities';
-import { formatItemText, itemKey, planMerge, sameItem } from '@/lib/scan/merge';
+import { formatItemText, itemKey, itemText, planMerge, sameItem } from '@/lib/scan/merge';
 import { parseScanResult, type ScanItem } from '@/lib/scan/result';
 
 const item = (patch: Partial<ScanItem>): ScanItem => ({
@@ -121,5 +121,45 @@ describe('parseScanResult', () => {
   it('caps the number of items', () => {
     const many = Array.from({ length: 80 }, (_, i) => ({ raw: '', name: `Artikel ${i}`, count: 0, unit: '', note: '', confidence: 'high' }));
     expect(parseScanResult({ ok: true, version: 1, items: many })?.items).toHaveLength(60);
+  });
+});
+
+describe('Einkaufszettel 1:1, Rezepte umgerechnet', () => {
+  const milk = item({ raw: '4 Milch', name: 'Milch', count: 4 });
+  const bananas = item({ raw: '2-3 Bananen', name: 'Bananen', count: 3, note: '2-3 Stück' });
+  const eggs = item({ raw: '18er Eier', name: 'Eier', count: 1, unit: 'Packung', note: '18er' });
+  const flour = item({ raw: '500 g Mehl', name: 'Mehl', count: 1, unit: 'Packung' });
+
+  it('uebernimmt Zettel genau wie geschrieben', () => {
+    expect(itemText(milk, 'shopping_list')).toBe('4 Milch');
+    expect(itemText(bananas, 'shopping_list')).toBe('2-3 Bananen');
+    expect(itemText(eggs, 'shopping_list')).toBe('18er Eier');
+  });
+
+  it('rechnet Rezepte in Einkaufsmengen um', () => {
+    expect(itemText(flour, 'recipe')).toBe('1 Packung Mehl');
+    expect(itemText(bananas, 'recipe')).toBe('3 Bananen (2-3 Stück)');
+  });
+
+  it('faellt ohne raw auf die formatierte Fassung zurueck', () => {
+    expect(itemText(item({ raw: '  ', name: 'Mehl', count: 1, unit: 'Packung' }), 'shopping_list')).toBe('1 Packung Mehl');
+  });
+
+  it('behaelt zwei Zeilen mit demselben Produkt auf einem Zettel', () => {
+    const rows = planMerge(
+      [item({ raw: '2 Hähnchenwurst B', name: 'Hähnchenwurst' }), item({ raw: '4. Hähnchenwurst C', name: 'Hähnchenwurst' })],
+      [],
+      'shopping_list'
+    );
+    expect(rows.map((r) => [r.text, r.selected])).toEqual([['2 Hähnchenwurst B', true], ['4. Hähnchenwurst C', true]]);
+  });
+
+  it('markiert eine wortgleiche Zeile als doppelt und kennt weiter die offene Liste', () => {
+    const rows = planMerge([milk, item({ raw: '4 Milch', name: 'Milch' }), bananas], [{ id: 'b', text: 'Bananen', is_completed: false }], 'shopping_list');
+    expect(rows.map((r) => [r.text, r.selected, r.reason ?? null])).toEqual([
+      ['4 Milch', true, null],
+      ['4 Milch', false, 'duplicate_scan'],
+      ['2-3 Bananen', false, 'duplicate_open'],
+    ]);
   });
 });
