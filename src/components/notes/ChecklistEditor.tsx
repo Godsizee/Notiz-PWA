@@ -296,6 +296,21 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
   const [isSaving, setIsSaving] = useState(false);
   const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
 
+  // Pro Geraet gemerkt, wie in Google Keep: wer eingeklappt einkauft, will es
+  // beim naechsten Oeffnen wieder so.
+  const [completedCollapsed, setCompletedCollapsed] = useState(() => {
+    try { return localStorage.getItem('checklist.completedCollapsed') === '1'; } catch { return false; }
+  });
+  const toggleCompletedCollapsed = () => {
+    const next = !completedCollapsed;
+    setCompletedCollapsed(next);
+    try {
+      localStorage.setItem('checklist.completedCollapsed', next ? '1' : '0');
+    } catch {
+      // Privater Modus o. ae.: gilt dann nur bis zum Schliessen.
+    }
+  };
+
   // Foto-Scan: gewaehlte Fotos → ScanSheet (liest + Pruefansicht) → handleScanCommit.
   const [scanFiles, setScanFiles] = useState<File[] | null>(null);
   const [showScanMenu, setShowScanMenu] = useState(false);
@@ -1036,12 +1051,18 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
         {/* Completed Items Section */}
         {completedItems.length > 0 && (
           <div className="mt-8 pt-4">
-            <h4 className="text-[11px] font-extrabold text-[var(--text-muted)] tracking-widest uppercase mb-3 flex items-center gap-2">
+            <button
+              onClick={toggleCompletedCollapsed}
+              aria-expanded={!completedCollapsed}
+              className="mb-3 flex min-h-10 w-full items-center gap-2 text-[11px] font-extrabold text-[var(--text-muted)] tracking-widest uppercase cursor-pointer"
+            >
               <span className="h-[1px] flex-1 bg-[var(--border-color)]"></span>
               Erledigt ({completedItems.length})
+              <ChevronDown className={`w-4 h-4 transition-transform ${completedCollapsed ? '' : 'rotate-180'}`} />
               <span className="h-[1px] flex-1 bg-[var(--border-color)]"></span>
-            </h4>
+            </button>
 
+            {!completedCollapsed && (
             <div className="space-y-0.5 opacity-70">
               <AnimatePresence initial={false}>
                 {completedItems.map((item) => {
@@ -1099,6 +1120,7 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
                 })}
               </AnimatePresence>
             </div>
+            )}
           </div>
         )}
       </motion.div>
