@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Outfit } from "next/font/google";
+import localFont from "next/font/local";
 import { SerwistProvider } from "@serwist/turbopack/react";
 import "./globals.css";
 import PwaUpdateReload from "@/components/PwaUpdateReload";
@@ -14,6 +15,25 @@ const outfit = Outfit({
   weight: ["300", "400", "500", "600", "700", "800"],
   display: "swap",
   variable: "--font-outfit",
+});
+
+// Schriften des 4. Designs "Life OS" (Bricolage Grotesque + JetBrains Mono, SIL OFL 1.1,
+// Lizenztexte neben den Dateien). Lokal gebuendelt statt von einem CDN, und ohne
+// preload: Wer ein anderes Design nutzt, laedt sie nie — der Browser holt die
+// Dateien erst, wenn ein Element die Schrift tatsaechlich verwendet.
+const bricolage = localFont({
+  src: "./fonts/bricolage-grotesque-latin.woff2",
+  weight: "200 800",
+  display: "swap",
+  variable: "--font-bricolage",
+  preload: false,
+});
+const jetbrains = localFont({
+  src: "./fonts/jetbrains-mono-latin.woff2",
+  weight: "100 800",
+  display: "swap",
+  variable: "--font-jetbrains",
+  preload: false,
 });
 
 export const metadata: Metadata = {
@@ -72,7 +92,7 @@ const themeScript = `
   var meta = document.createElement('meta');
   meta.setAttribute('name', 'theme-color');
   meta.id = 'theme-color-dynamic';
-  meta.setAttribute('content', theme === 'amoled' ? '#000000' : theme === 'dark' ? '#0b0717' : '#390099');
+  meta.setAttribute('content', theme === 'amoled' ? '#000000' : theme === 'dark' ? '#0b0717' : theme === 'lifeos' ? '#fff4e0' : '#390099');
   document.head.appendChild(meta);
 })();
 `;
@@ -83,7 +103,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="de" className={`scroll-smooth ${outfit.variable}`} suppressHydrationWarning>
+    <html lang="de" className={`scroll-smooth ${outfit.variable} ${bricolage.variable} ${jetbrains.variable}`} suppressHydrationWarning>
       <head>
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="mobile-web-app-capable" content="yes" />

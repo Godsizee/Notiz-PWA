@@ -77,12 +77,12 @@ export default function HomeTopBar({ searchQuery, onSearchChange }: HomeTopBarPr
       style={{ transform: hidden ? "translateY(-100%)" : undefined }}
     >
       <div className="mx-auto max-w-4xl px-3 py-2">
-        <div className="flex h-14 items-center gap-1 rounded-full border border-[var(--border-color)] bg-[var(--card-bg)] px-1 shadow-[var(--shadow-card)]">
+        <div className="flex h-14 items-center gap-1 rounded-[var(--radius-pill)] border border-[var(--border-color)] bg-[var(--card-bg)] px-1 shadow-[var(--shadow-card)]">
           {/* Logo: Tipp scrollt nach oben */}
           <button
             onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-            className="tap-target shrink-0 rounded-full cursor-pointer"
-            aria-label="Nach oben"
+            className="tap-target shrink-0 rounded-[var(--radius-pill)] cursor-pointer"
+            aria-label="B&B – Nach oben"
             title="Nach oben"
           >
             {/* next/image lohnt sich hier nicht: statisches Logo (7 KB), und der
@@ -95,8 +95,10 @@ export default function HomeTopBar({ searchQuery, onSearchChange }: HomeTopBarPr
               width={36}
               height={36}
               decoding="async"
-              className="h-9 w-9 rounded-full object-cover"
+              className="logo-img h-9 w-9 rounded-[var(--radius-pill)] object-cover"
             />
+            {/* Life-OS-Design: statt des violetten App-Icons ein pinker Sticker */}
+            <span className="logo-sticker" aria-hidden="true">B&amp;B</span>
           </button>
 
           <input
@@ -120,7 +122,7 @@ export default function HomeTopBar({ searchQuery, onSearchChange }: HomeTopBarPr
           {searchQuery ? (
             <button
               onClick={() => onSearchChange("")}
-              className="tap-target shrink-0 rounded-full text-[var(--text-muted)] hover:bg-[var(--text-primary)]/5 cursor-pointer"
+              className="tap-target shrink-0 rounded-[var(--radius-pill)] text-[var(--text-muted)] hover:bg-[var(--text-primary)]/5 cursor-pointer"
               aria-label="Suche leeren"
               title="Suche leeren"
             >
@@ -136,12 +138,12 @@ export default function HomeTopBar({ searchQuery, onSearchChange }: HomeTopBarPr
           {hasDeadLetters ? (
             <button
               onClick={() => clearDeadLetters()}
-              className="tap-target relative shrink-0 rounded-full hover:bg-[var(--text-primary)]/5 cursor-pointer"
+              className="tap-target relative shrink-0 rounded-[var(--radius-pill)] hover:bg-[var(--text-primary)]/5 cursor-pointer"
               title={syncTitle}
               aria-label={syncTitle}
             >
               <CloudOff className="w-4.5 h-4.5 text-amber-500" />
-              <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[11px] font-bold text-white">
+              <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-[var(--radius-pill)] bg-amber-500 px-1 text-[11px] font-bold text-white">
                 {deadLetterCount}
               </span>
             </button>
@@ -149,7 +151,7 @@ export default function HomeTopBar({ searchQuery, onSearchChange }: HomeTopBarPr
             <div
               role="status"
               aria-label={syncTitle}
-              className="tap-target relative shrink-0 rounded-full cursor-help"
+              className="tap-target relative shrink-0 rounded-[var(--radius-pill)] cursor-help"
               title={syncTitle}
             >
               {!isOnline ? (
@@ -160,7 +162,7 @@ export default function HomeTopBar({ searchQuery, onSearchChange }: HomeTopBarPr
                 <Cloud className="w-4.5 h-4.5 text-[var(--text-muted)]" />
               )}
               {pendingCount > 0 && (
-                <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[11px] font-bold text-white">
+                <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-[var(--radius-pill)] bg-amber-500 px-1 text-[11px] font-bold text-white">
                   {pendingCount}
                 </span>
               )}

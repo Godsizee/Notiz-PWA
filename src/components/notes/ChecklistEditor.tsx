@@ -1419,7 +1419,7 @@ export default function ChecklistEditor({ note, onClose, onCreated, onArchived, 
                 aria-selected={false}
                 onMouseDown={(e) => e.preventDefault() /* Fokus im Feld halten */}
                 onClick={() => { setNewItemText(s); void handleAddItemText(s); }}
-                className="min-h-9 rounded-full border border-[var(--border-color)] px-3 text-sm text-[var(--text-secondary)] hover:bg-[var(--primary-light)] cursor-pointer"
+                className="min-h-9 rounded-[var(--radius-pill)] border border-[var(--border-color)] px-3 text-sm text-[var(--text-secondary)] hover:bg-[var(--primary-light)] cursor-pointer"
               >
                 {s}
               </button>

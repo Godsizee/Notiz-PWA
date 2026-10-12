@@ -304,7 +304,7 @@ export default function NoteCard({
             {items.length > MAX_PREVIEW_ITEMS && (
               <div className="pt-2.5 flex items-center gap-2">
                 <div className="h-[1px] flex-1 bg-[var(--border-color)]"></div>
-                <p className="text-[11px] font-extrabold text-[var(--text-muted)] uppercase tracking-widest bg-background/50 px-2 py-0.5 rounded-full border border-[var(--border-color)]">
+                <p className="text-[11px] font-extrabold text-[var(--text-muted)] uppercase tracking-widest bg-background/50 px-2 py-0.5 rounded-[var(--radius-pill)] border border-[var(--border-color)]">
                   + {items.length - MAX_PREVIEW_ITEMS} weitere
                 </p>
                 <div className="h-[1px] flex-1 bg-[var(--border-color)]"></div>

@@ -67,6 +67,9 @@
   --text-secondary: #564b6e;
   --text-muted: #6b6385;
 
+  /* Pillen (Suchleiste, Chips, Leistenknoepfe): rund; das Life-OS-Design macht sie eckig */
+  --radius-pill: 9999px;
+
   /* Brand action colors */
   --primary: #390099;          /* accent text / icon on light surfaces */
   --primary-strong: #390099;   /* filled buttons — always pairs with white text */
@@ -191,9 +194,89 @@
   --glow-b: rgba(157, 78, 221, 0.12);
 }
 
+/* ------------------------------------------------------------------ */
+/*  Life OS theme (4. Design) — hell, neo-brutalistisch. Vorlage: das   */
+/*  helle Design von "Life OS" (cremefarbene Seite mit Punktraster,     */
+/*  weisse Flaechen, Tintenrahmen, harte Versatzschatten, eckige Kanten,*/
+/*  Bricolage Grotesque + JetBrains Mono, pinkes Signal). Keine         */
+/*  Dunkelvariante: ohne .dark, die Klasse allein setzt das Design.     */
+/* ------------------------------------------------------------------ */
+.lifeos {
+  --font-sans: var(--font-bricolage), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  --background: #fff4e0;
+  --background-soft: #f3ead7;
+  --foreground: #0b0b0b;
+  --card-bg: #ffffff;
+  --border-color: #0b0b0b;
+
+  --text-primary: #0b0b0b;
+  --text-secondary: #2e2a24;
+  --text-muted: #5a5348;
+
+  /* Tinte ist die Hauptfarbe (schwarze Knoepfe mit weisser Schrift), Pink das Signal. */
+  --primary: #0b0b0b;
+  --primary-strong: #0b0b0b;
+  --accent: #ff6fb5;
+  --primary-hover: #2e2a24;
+  --primary-on: #ffffff;
+  --primary-light: rgba(255, 111, 181, 0.22);
+  --primary-ring: #0b0b0b;
+  --signal: #ff6fb5;
+
+  --fab-bg: #ff6fb5;
+  --fab-gradient: none;
+  --brand-gradient: linear-gradient(#0b0b0b, #0b0b0b);
+  --glow-a: transparent;
+  --glow-b: transparent;
+
+  /* Harte Versatzschatten statt weicher Verlaeufe */
+  --shadow-card: 4px 4px 0 0 #0b0b0b;
+  --shadow-elevated: 6px 6px 0 0 #0b0b0b;
+
+  --radius-pill: 0px;
+  --radius-xs: 0px;
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
+  --radius-3xl: 0px;
+  --radius-4xl: 0px;
+
+  /* Notizfarben: die gedaempften Modulfarben von Life OS mit Tintenrahmen */
+  --note-white: #ffffff;
+  --note-white-border: #0b0b0b;
+  --note-white-icon: #2e2a24;
+
+  --note-blue: #c9d9ff;
+  --note-blue-border: #0b0b0b;
+  --note-blue-icon: #0b0b0b;
+
+  --note-green: #bdf1d4;
+  --note-green-border: #0b0b0b;
+  --note-green-icon: #0b0b0b;
+
+  --note-yellow: #fff0a8;
+  --note-yellow-border: #0b0b0b;
+  --note-yellow-icon: #0b0b0b;
+
+  --note-pink: #ffd0e7;
+  --note-pink-border: #0b0b0b;
+  --note-pink-icon: #0b0b0b;
+
+  --note-purple: #ddd3ff;
+  --note-purple-border: #0b0b0b;
+  --note-purple-icon: #0b0b0b;
+
+  --note-orange: #ffd9b5;
+  --note-orange-border: #0b0b0b;
+  --note-orange-icon: #0b0b0b;
+}
+
 /* No-JS fallback: honor the OS preference when no explicit theme class set */
 @media (prefers-color-scheme: dark) {
-  :root:not(.light):not(.dark) {
+  :root:not(.light):not(.dark):not(.lifeos) {
     --background: #0b0717;
     --background-soft: #140c28;
     --foreground: #f3f0fb;
@@ -455,3 +538,103 @@ input, textarea {
 /* Vollbild-Notiz offen (NoteScreen variant="overlay"): die Seite darunter
    nicht mitscrollen. Scrollposition bleibt erhalten. */
 html.note-open, html.note-open body { overflow: hidden; }
+
+/* ------------------------------------------------------------------ */
+/*  Life OS: Struktur (Rahmen, Schatten, Typografie)                   */
+/*  Die Farben und Radien kommen aus den Tokens in .lifeos oben; hier  */
+/*  stehen nur die Dinge, die sich nicht ueber ein Token umstellen     */
+/*  lassen, weil Tailwind sie als feste Werte ausgibt.                 */
+/* ------------------------------------------------------------------ */
+
+/* Cremefarbene Seite mit Punktraster */
+html.lifeos body,
+html.lifeos main {
+  background-image: radial-gradient(circle at 1px 1px, rgba(11, 11, 11, 0.09) 1px, transparent 0);
+  background-size: 18px 18px;
+}
+
+/* Tintenrahmen: 2 px statt 1 px */
+html.lifeos .border { border-width: 2px; }
+html.lifeos .border-t { border-top-width: 2px; }
+html.lifeos .border-b { border-bottom-width: 2px; }
+html.lifeos .border-l { border-left-width: 2px; }
+html.lifeos .border-r { border-right-width: 2px; }
+
+/* Kein Glas, kein Blur, keine weichen Schatten */
+html.lifeos .glass {
+  background: var(--card-bg);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-width: 2px;
+}
+html.lifeos .surface { border-width: 2px; }
+html.lifeos .backdrop-blur-xl,
+html.lifeos .backdrop-blur-md,
+html.lifeos .backdrop-blur-sm {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+html.lifeos .shadow-sm { box-shadow: none; }
+html.lifeos .shadow-xl,
+html.lifeos .shadow-2xl { box-shadow: var(--shadow-elevated); }
+html.lifeos .pointer-events-none[class*="blur-["] { display: none; }
+
+/* "Maschinenstimme": Labels, Ueberschriften und Chips in JetBrains Mono */
+html.lifeos .uppercase,
+html.lifeos .chip {
+  font-family: var(--font-jetbrains), ui-monospace, "Cascadia Mono", Menlo, monospace;
+  font-weight: 700;
+}
+html.lifeos .chip {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+html.lifeos h1,
+html.lifeos h2,
+html.lifeos h3 { letter-spacing: -0.01em; }
+
+/* Leistenknoepfe: aktiv = pinkes Signal mit Tintenrahmen (wie die aktive Navigation in Life OS) */
+html.lifeos .bar-btn[aria-pressed="true"],
+html.lifeos .bar-btn[aria-expanded="true"] {
+  background: var(--signal);
+  color: #0b0b0b;
+  box-shadow: inset 0 0 0 2px #0b0b0b;
+}
+
+/* Plus-Knopf: pink, Tintenrahmen, Versatzschatten, sinkt beim Druecken ein */
+html.lifeos .fab {
+  background-image: none !important;
+  background-color: var(--signal);
+  color: #0b0b0b;
+  border: 3px solid #0b0b0b;
+  box-shadow: 4px 4px 0 0 #0b0b0b;
+  transition: translate 90ms var(--ease-standard), box-shadow 90ms var(--ease-standard);
+}
+html.lifeos .fab:hover {
+  scale: 1;
+  translate: -1px -1px;
+  box-shadow: 5px 5px 0 0 #0b0b0b;
+}
+html.lifeos .fab:active {
+  scale: 1;
+  translate: 3px 3px;
+  box-shadow: 0 0 0 0 #0b0b0b;
+}
+
+/* Logo: im Life-OS-Design ein pinker Sticker (leicht gedreht, Versatzschatten) statt des App-Icons */
+.logo-sticker { display: none; }
+html.lifeos .logo-img { display: none; }
+html.lifeos .logo-sticker {
+  display: inline-block;
+  font-family: var(--font-jetbrains), ui-monospace, "Cascadia Mono", Menlo, monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.4;
+  text-transform: uppercase;
+  padding: 0.125rem 0.5rem;
+  color: #0b0b0b;
+  background: var(--signal);
+  border: 2px solid #0b0b0b;
+  box-shadow: 3px 3px 0 0 #0b0b0b;
+  rotate: -3deg;
+}

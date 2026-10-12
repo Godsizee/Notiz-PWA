@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { SlidersHorizontal, LayoutGrid, List, FileJson, FileText, Download, Sun, Moon, MoonStar, LogOut } from "lucide-react";
+import { SlidersHorizontal, LayoutGrid, List, FileJson, FileText, Download, Sun, Moon, MoonStar, Square, LogOut } from "lucide-react";
 import { usePreferencesStore, type FontSize, type SortMode, type ViewMode } from "@/store/usePreferencesStore";
 import { exportNotes, type ExportFormat } from "@/lib/exportNotes";
 import { useToastStore } from "@/store/useToastStore";
@@ -30,6 +30,7 @@ const THEME_OPTIONS: { id: Theme; label: string; Icon: typeof Sun }[] = [
   { id: "light", label: "Hell", Icon: Sun },
   { id: "dark", label: "Dunkel", Icon: Moon },
   { id: "amoled", label: "Schwarz", Icon: MoonStar },
+  { id: "lifeos", label: "Life OS", Icon: Square },
 ];
 
 function DesignSection() {
@@ -45,7 +46,7 @@ function DesignSection() {
       <p className="text-[11px] font-extrabold text-[var(--text-muted)] tracking-widest uppercase mb-2 pl-1">
         Design
       </p>
-      <div className="flex gap-1.5 mb-3" role="radiogroup" aria-label="Design">
+      <div className="grid grid-cols-2 gap-1.5 mb-3" role="radiogroup" aria-label="Design">
         {THEME_OPTIONS.map(({ id, label, Icon }) => {
           const active = theme === id;
           return (
@@ -115,7 +116,7 @@ export default function DisplaySettings({ userEmail, onLogout }: DisplaySettings
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={() => setOpen((v) => !v)}
-        className={`tap-target rounded-full border transition-colors cursor-pointer ${
+        className={`bar-btn tap-target rounded-[var(--radius-pill)] border transition-colors cursor-pointer ${
           open
             ? "bg-primary/10 border-primary/30 text-primary"
             : "border-transparent text-[var(--text-secondary)] hover:bg-[var(--text-primary)]/5"

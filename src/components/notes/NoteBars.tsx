@@ -28,7 +28,7 @@ export function NoteTopBar({ onBack, title, showTitle, scrollRef, actions }: Not
     >
       <button
         onClick={onBack}
-        className="tap-target shrink-0 rounded-full text-[var(--text-primary)] hover:bg-[var(--text-primary)]/5 cursor-pointer"
+        className="tap-target shrink-0 rounded-[var(--radius-pill)] text-[var(--text-primary)] hover:bg-[var(--text-primary)]/5 cursor-pointer"
         aria-label="Zur Übersicht"
         title="Zur Übersicht"
       >
@@ -107,7 +107,7 @@ export function BarButton({
       title={label}
       aria-pressed={pressed}
       aria-expanded={expanded}
-      className={`tap-target shrink-0 rounded-full transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 ${pressed ? 'bg-primary/10 text-primary' : 'text-[var(--text-secondary)] hover:bg-[var(--text-primary)]/5'}`}
+      className={`bar-btn tap-target shrink-0 rounded-[var(--radius-pill)] transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 ${pressed ? 'bg-primary/10 text-primary' : 'text-[var(--text-secondary)] hover:bg-[var(--text-primary)]/5'}`}
     >
       {children}
     </button>

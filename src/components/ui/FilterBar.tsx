@@ -46,7 +46,7 @@ export default function FilterBar({
               onFilterChange(f.id);
             }}
             aria-pressed={isActive}
-            className={`relative shrink-0 min-h-10 px-3.5 py-2 rounded-full text-xs font-bold tracking-wide transition-colors cursor-pointer whitespace-nowrap ${
+            className={`chip relative shrink-0 min-h-10 px-3.5 py-2 rounded-[var(--radius-pill)] text-xs font-bold tracking-wide transition-colors cursor-pointer whitespace-nowrap ${
               isActive
                 ? 'text-white'
                 : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[var(--card-bg)] border border-[var(--border-color)]'
@@ -56,7 +56,7 @@ export default function FilterBar({
               <motion.span
                 layoutId="filter-pill"
                 transition={{ type: 'spring', damping: 26, stiffness: 320 }}
-                className="absolute inset-0 bg-primary-strong rounded-full -z-0"
+                className="absolute inset-0 bg-primary-strong rounded-[var(--radius-pill)] -z-0"
               />
             )}
             <span className="relative z-10">{f.label}</span>

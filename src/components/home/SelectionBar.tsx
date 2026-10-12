@@ -52,7 +52,7 @@ export default function SelectionBar({
   return (
     <header className="sticky top-0 z-40 safe-t">
       <div className="mx-auto max-w-4xl px-3 py-2">
-        <div className="relative flex h-14 items-center gap-1 rounded-full border border-[var(--border-color)] bg-[var(--card-bg)] px-1 shadow-[var(--shadow-card)]">
+        <div className="relative flex h-14 items-center gap-1 rounded-[var(--radius-pill)] border border-[var(--border-color)] bg-[var(--card-bg)] px-1 shadow-[var(--shadow-card)]">
           <BarButton label="Auswahl beenden" onClick={onExit}>
             <X size={22} />
           </BarButton>
@@ -91,7 +91,7 @@ export default function SelectionBar({
                 {NOTE_COLORS.map((c) => (
                   <button
                     key={c.id}
-                    className="relative flex h-9 w-9 items-center justify-center rounded-full border border-black/10 shadow-inner transition-transform hover:scale-110 cursor-pointer"
+                    className="relative flex h-9 w-9 items-center justify-center rounded-[var(--radius-pill)] border border-black/10 shadow-inner transition-transform hover:scale-110 cursor-pointer"
                     style={{ backgroundColor: c.hex }}
                     onClick={() => { setShowPalette(false); onChangeColor(c.hex); }}
                     title={c.label}
