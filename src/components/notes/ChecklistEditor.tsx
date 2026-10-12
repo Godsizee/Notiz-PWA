@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { RecordModel } from 'pocketbase';
 import { pb, isOwnedByMe } from '@/lib/pb';
-import { Palette, Pin, Archive, Trash2, Plus, X, CheckCircle2, Circle, Check, RefreshCw, MoreVertical, RotateCcw, GripVertical, Users } from 'lucide-react';
+import { Palette, Pin, Archive, Trash2, Plus, X, CheckCircle2, Circle, Check, RefreshCw, MoreVertical, RotateCcw, GripVertical, Users, ScanText, Camera, Images } from 'lucide-react';
 import { useRealtimeChecklist } from '@/lib/useRealtime';
 import { applyChange, newRecordId, isAbortError } from '@/lib/sync';
 import { usePresence } from '@/lib/usePresence';
@@ -13,6 +13,11 @@ import { hapticLight, hapticHeavy } from '@/lib/haptics';
 import { parseQuantity } from '@/lib/quantities';
 import { useToastStore } from '@/store/useToastStore';
 import ConfettiBurst from '@/components/ui/ConfettiBurst';
+import ScanSheet from '@/components/notes/ScanSheet';
+import { commitScanRows, undoScanCommit } from '@/lib/scan/commit';
+import type { MergeRow } from '@/lib/scan/merge';
+import type { ScanResult } from '@/lib/scan/result';
+import { useSyncStore } from '@/store/useSyncStore';
 
 const UNDO_DELETE_MS = 5000;
 
@@ -290,6 +295,14 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
   const [newItemText, setNewItemText] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
+
+  // Foto-Scan: gewaehlte Fotos → ScanSheet (liest + Pruefansicht) → handleScanCommit.
+  const [scanFiles, setScanFiles] = useState<File[] | null>(null);
+  const [showScanMenu, setShowScanMenu] = useState(false);
+  const scanCameraRef = useRef<HTMLInputElement>(null);
+  const scanGalleryRef = useRef<HTMLInputElement>(null);
+  const lastScanSourceRef = useRef<'camera' | 'gallery'>('camera');
+  const isOnline = useSyncStore((s) => s.isOnline);
 
   // Local state for 450ms Visual Checkbox-Delay Engine
   const [togglingItems, setTogglingItems] = useState<Record<string, { is_completed: boolean; timer: NodeJS.Timeout }>>({});
@@ -779,6 +792,74 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
     });
   };
 
+  // Offline gar nicht erst fotografieren lassen: der Scan braucht Netz, und
+  // ein Foto, das danach verworfen wird, ist verschwendete Muehe.
+  const pickScanPhoto = (source: 'camera' | 'gallery') => {
+    setShowScanMenu(false);
+    setShowBulkMenu(false);
+    if (!isOnline || !navigator.onLine) {
+      showToast({ message: 'Der Foto-Scan braucht eine Internetverbindung.', duration: 3500 });
+      return;
+    }
+    lastScanSourceRef.current = source;
+    (source === 'camera' ? scanCameraRef : scanGalleryRef).current?.click();
+  };
+
+  const onScanInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const picked = Array.from(e.target.files ?? []).filter((f) => f.type.startsWith('image/'));
+    // Reset, damit dasselbe Foto nach einem Fehler erneut gewaehlt werden kann.
+    e.target.value = '';
+    if (picked.length === 0) return;
+    if (picked.length > 3) showToast({ message: 'Es werden nur die ersten 3 Fotos gelesen.', duration: 3500 });
+    setScanFiles(picked.slice(0, 3));
+  };
+
+  // "Anderes Foto" im ScanSheet: gleiche Quelle wie beim letzten Mal. Der Klick
+  // im Sheet ist eine Nutzergeste, also darf .click() den Picker oeffnen.
+  const retakeScanPhoto = () => {
+    setScanFiles(null);
+    pickScanPhoto(lastScanSourceRef.current);
+  };
+
+  const handleScanCommit = useCallback(async (rows: MergeRow[], result: ScanResult) => {
+    const noteId = await ensureNoteExists();
+    // Neue, noch unbenannte Liste aus einem Rezept → Rezeptname als Titel.
+    if (!titleRef.current.trim() && result.sourceType === 'recipe' && result.title) {
+      setTitle(result.title);
+    }
+    const startOrder = itemsRef.current.reduce((max, i) => Math.max(max, i.order ?? 0), -1) + 1;
+    const textById = new Map(itemsRef.current.map((i) => [i.id, String(i.text ?? '')]));
+    const commit = await commitScanRows(noteId, rows, startOrder, textById);
+    const done = commit.createdIds.length + commit.reopened.length;
+
+    if (done === 0) {
+      showToast({ message: 'Die Einträge konnten nicht gespeichert werden.', tone: 'danger', duration: 4000 });
+      throw new Error('scan commit failed'); // ScanSheet bleibt in der Pruefansicht
+    }
+
+    // Sofort anzeigen statt auf das Realtime-Echo zu warten (gleiches Muster
+    // wie handleAddItem); applyEvent dedupliziert das Echo spaeter.
+    setItems((prev) => {
+      const byId = new Map(prev.map((i) => [i.id, i]));
+      commit.records.forEach((r) => byId.set(r.id, r));
+      return [...byId.values()].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    });
+    setScanFiles(null);
+    hapticLight();
+    showToast({
+      message: commit.failed > 0
+        ? `${done} übernommen, ${commit.failed} fehlgeschlagen`
+        : `${done} ${done === 1 ? 'Eintrag' : 'Einträge'} übernommen`,
+      tone: commit.failed > 0 ? 'danger' : 'default',
+      actionLabel: 'Rückgängig',
+      duration: UNDO_DELETE_MS,
+      onAction: () => {
+        undoScanCommit(noteId, commit).catch(() => {});
+        hapticLight();
+      },
+    });
+  }, [ensureNoteExists, setItems, showToast]);
+
   // Visual completion respects an in-flight toggle immediately, so an item
   // jumps to the other section the instant it's tapped instead of waiting for
   // the debounced write below to resolve (see handleToggleItem).
@@ -816,6 +897,10 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
     >
       {/* Micro-Delight: Konfetti, wenn der letzte offene Eintrag abgehakt wird */}
       {confettiKey > 0 && <ConfettiBurst key={confettiKey} />}
+
+      {/* Zwei Inputs statt einem: `capture` laesst Android direkt die Kamera oeffnen. */}
+      <input ref={scanCameraRef} type="file" accept="image/*" capture="environment" onChange={onScanInputChange} className="hidden" />
+      <input ref={scanGalleryRef} type="file" accept="image/*" multiple onChange={onScanInputChange} className="hidden" />
 
       {/* Title Header */}
       <div className="p-6 pb-2">
@@ -904,7 +989,38 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
               }
             }}
           />
+          <button
+            onClick={() => { setShowScanMenu((v) => !v); setShowBulkMenu(false); setShowPalette(false); }}
+            className={`tap-target-sm shrink-0 rounded-xl transition-colors cursor-pointer ${showScanMenu ? 'bg-primary/10 text-primary' : 'text-[var(--text-muted)] hover:text-primary'}`}
+            aria-label="Einkaufszettel oder Rezept scannen"
+            aria-expanded={showScanMenu}
+            title="Zettel oder Rezept scannen"
+          >
+            <ScanText className="w-5 h-5" />
+          </button>
         </div>
+        <AnimatePresence initial={false}>
+          {showScanMenu && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="flex flex-wrap items-center gap-2 py-2 pl-8">
+                <button onClick={() => pickScanPhoto('camera')} className="flex min-h-10 items-center gap-2 rounded-xl border border-[var(--border-color)] px-3 text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--primary-light)] cursor-pointer">
+                  <Camera className="w-4 h-4 text-primary" /> Foto aufnehmen
+                </button>
+                <button onClick={() => pickScanPhoto('gallery')} className="flex min-h-10 items-center gap-2 rounded-xl border border-[var(--border-color)] px-3 text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--primary-light)] cursor-pointer">
+                  <Images className="w-4 h-4 text-primary" /> Aus Galerie
+                </button>
+                <p className="w-full text-[11px] leading-snug text-[var(--text-muted)]">
+                  Funktioniert mit Einkaufszetteln und Rezepten. Das Foto wird zur Texterkennung an Claude (Anthropic) übertragen und nicht in der App gespeichert.
+                </p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Completed Items Section */}
         {completedItems.length > 0 && (
@@ -1085,6 +1201,15 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
                 className="absolute bottom-16 right-0 bg-card border border-[var(--border-color)] shadow-2xl rounded-2xl p-2 flex flex-col gap-1 z-[60] min-w-[200px]"
               >
                 <button
+                  onClick={() => pickScanPhoto('camera')}
+                  className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--background)]/80 transition-colors cursor-pointer text-left"
+                >
+                  <ScanText className="w-4 h-4 text-primary" />
+                  <span>Zettel oder Rezept scannen</span>
+                </button>
+                <div className="h-px bg-[var(--border-color)] my-1 mx-2" />
+
+                <button
                   onClick={handleResetAll}
                   disabled={completedItems.length === 0}
                   className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--background)]/80 transition-colors cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
@@ -1116,6 +1241,14 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
           </button>
         </div>
       </div>
+
+      <ScanSheet
+        files={scanFiles}
+        existingItems={items}
+        onClose={() => setScanFiles(null)}
+        onCommit={handleScanCommit}
+        onRetake={retakeScanPhoto}
+      />
     </div>
   );
 }
