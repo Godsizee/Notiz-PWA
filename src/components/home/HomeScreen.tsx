@@ -600,7 +600,7 @@ export default function HomeScreen() {
               {/* Pinned Notes Section */}
               {pinnedNotes.length > 0 && (
                 <div className="space-y-3">
-                  <h4 className="text-[11px] font-extrabold text-[var(--text-muted)] tracking-widest uppercase pl-1 flex items-center gap-1.5">
+                  <h4 className="text-[11px] font-extrabold text-[var(--text-secondary)] tracking-widest uppercase pl-1 flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
                     Angepinnt ({pinnedNotes.length})
                   </h4>
@@ -612,7 +612,7 @@ export default function HomeScreen() {
               {regularNotes.length > 0 && (
                 <div className="space-y-3">
                   {pinnedNotes.length > 0 && (
-                    <h4 className="text-[11px] font-extrabold text-[var(--text-muted)] tracking-widest uppercase pl-1 pt-2">
+                    <h4 className="text-[11px] font-extrabold text-[var(--text-secondary)] tracking-widest uppercase pl-1 pt-2">
                       Weitere Notizen ({regularNotes.length})
                     </h4>
                   )}

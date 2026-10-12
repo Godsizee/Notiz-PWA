@@ -24,10 +24,22 @@ interface NoteScreenProps {
 
 export default function NoteScreen({ open, layoutId, label, variant, children }: NoteScreenProps) {
   // Fokus nach dem Schliessen zurueck auf die Karte/den Knopf, der geoeffnet hat.
+  // Das zuletzt fokussierte Element wird schon vor dem Oeffnen mitgeschrieben:
+  // sobald die Notiz offen ist, ist die Uebersicht inert und hat den Fokus
+  // bereits verloren (activeElement waere dann <body>).
+  const lastFocusRef = useRef<HTMLElement | null>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
+    if (open) return;
+    const onFocusIn = (e: FocusEvent) => {
+      lastFocusRef.current = e.target as HTMLElement | null;
+    };
+    document.addEventListener('focusin', onFocusIn);
+    return () => document.removeEventListener('focusin', onFocusIn);
+  }, [open]);
+  useEffect(() => {
     if (open) {
-      returnFocusRef.current = document.activeElement as HTMLElement | null;
+      returnFocusRef.current = lastFocusRef.current;
       return;
     }
     returnFocusRef.current?.focus?.();

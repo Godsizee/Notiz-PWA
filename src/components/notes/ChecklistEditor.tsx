@@ -131,7 +131,7 @@ const ActiveChecklistRow = memo(function ActiveChecklistRow({
             <span className="px-1.5 py-0.5 rounded-md text-xs font-bold bg-[var(--text-primary)]/8 text-[var(--text-secondary)] border border-[var(--border-color)] shrink-0">
               {quantity}
             </span>
-            <span className={`truncate ${isCompletedVisual ? 'line-through text-[var(--text-muted)]/60' : ''}`}>
+            <span className={`truncate ${isCompletedVisual ? 'line-through text-[var(--text-muted)]' : ''}`}>
               {restText}
             </span>
           </div>
@@ -139,6 +139,7 @@ const ActiveChecklistRow = memo(function ActiveChecklistRow({
         <input
           ref={(el) => registerRef(item.id, el)}
           type="text"
+          aria-label="Eintrag"
           className={`w-full bg-transparent border-none outline-none text-base md:text-lg text-[var(--text-primary)] transition-all ${isCompletedVisual ? 'line-through text-[var(--text-muted)]/60' : ''} ${!isFocused && quantity ? 'text-transparent selection:text-transparent' : ''}`}
           value={item.text}
           onFocus={() => setIsFocused(true)}
@@ -1464,7 +1465,7 @@ export default function ChecklistEditor({ note, onClose, onCreated, onArchived, 
             </button>
 
             {!completedCollapsed && (
-            <div className="space-y-0.5 opacity-70">
+            <div className="space-y-0.5">
               <AnimatePresence initial={false}>
                 {completedItems.map((item) => {
                   const isCompletedVisual = visualCompletion(item);

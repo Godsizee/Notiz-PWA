@@ -282,7 +282,7 @@ export default function NoteCard({
                 ) : (
                   <Circle className="w-4 h-4 text-[var(--text-muted)]/40 shrink-0" />
                 )}
-                <span className={`text-sm ${item.is_completed ? 'line-through text-[var(--text-muted)]/60 font-normal' : 'text-[var(--text-secondary)] font-medium'} line-clamp-1 flex items-center gap-1.5 min-w-0 overflow-hidden`}>
+                <span className={`text-sm ${item.is_completed ? 'line-through text-[var(--text-muted)] font-normal' : 'text-[var(--text-secondary)] font-medium'} line-clamp-1 flex items-center gap-1.5 min-w-0 overflow-hidden`}>
                   {(() => {
                     const { quantity, text: restText } = parseQuantity(item.text);
                     if (quantity) {
