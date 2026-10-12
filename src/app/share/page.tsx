@@ -127,7 +127,7 @@ export default function SharePage() {
   }, [router]);
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-[var(--background)]">
+    <div className="mx-auto max-w-4xl flex items-center justify-center min-h-screen bg-[var(--background)]">
       <div className="flex flex-col items-center gap-4">
         <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
         <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest animate-pulse">

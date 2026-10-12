@@ -9,7 +9,7 @@ import { CloudOff } from "lucide-react";
 // unprecached deep link (e.g. a fresh install that hasn't finished caching).
 export default function OfflineFallbackPage() {
   return (
-    <div className="min-h-dvh flex flex-col items-center justify-center gap-3 p-6 text-center">
+    <div className="mx-auto max-w-4xl min-h-dvh flex flex-col items-center justify-center gap-3 p-6 text-center">
       <div className="w-14 h-14 rounded-2xl bg-[var(--card-bg)] border border-[var(--border-color)] shadow-[var(--shadow-card)] flex items-center justify-center text-amber-500">
         <CloudOff className="w-6 h-6" />
       </div>

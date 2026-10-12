@@ -12,11 +12,13 @@ interface FABProps {
   onCreateChecklist: () => void;
   /** Beim Runterscrollen nur das Plus zeigen, beim Hochscrollen mit Beschriftung. */
   compact?: boolean;
+  /** 'column': am rechten Rand der 420-px-Listenspalte (Liste-Detail ab 1024 px) statt am Bildschirmrand. */
+  anchor?: 'screen' | 'column';
 }
 
 const LONG_PRESS_MS = 300;
 
-export default function FAB({ onCreateText, onCreateChecklist, compact = false }: FABProps) {
+export default function FAB({ onCreateText, onCreateChecklist, compact = false, anchor = 'screen' }: FABProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressedRef = useRef(false);
@@ -76,7 +78,16 @@ export default function FAB({ onCreateText, onCreateChecklist, compact = false }
         )}
       </AnimatePresence>
 
-      <div className="fixed bottom-6 right-5 sm:bottom-8 sm:right-6 z-40 flex flex-col items-end gap-3" style={{ marginBottom: "env(safe-area-inset-bottom)" }}>
+      <div
+        className={`fixed bottom-6 sm:bottom-8 z-40 flex flex-col items-end gap-3 ${anchor === 'screen' ? 'right-5 sm:right-6' : ''}`}
+        style={{
+          marginBottom: "env(safe-area-inset-bottom)",
+          // Der Seitenrahmen ist max 80 rem breit und zentriert; die Listenspalte steht links darin.
+          ...(anchor === 'column'
+            ? { left: 'calc(max(0px, (100vw - 80rem) / 2) + 420px - 1.25rem)', transform: 'translateX(-100%)' }
+            : {}),
+        }}
+      >
         {/* Long-press type picker */}
         <AnimatePresence>
           {menuOpen && (

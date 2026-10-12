@@ -100,7 +100,7 @@ export default function RootLayout({
         >
           <MotionProvider>
             <PwaUpdateReload />
-            <div className="mx-auto max-w-4xl relative min-h-screen">
+            <div className="relative min-h-screen">
               {children}
             </div>
           </MotionProvider>

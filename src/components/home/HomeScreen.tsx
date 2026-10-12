@@ -532,7 +532,7 @@ export default function HomeScreen() {
       <div className="space-y-2.5">{children}</div>
     ) : (
       <Masonry
-        breakpointCols={breakpointColumnsObj}
+        breakpointCols={isWide ? 1 : breakpointColumnsObj}
         className="my-masonry-grid"
         columnClassName="my-masonry-grid_column"
       >
@@ -544,10 +544,12 @@ export default function HomeScreen() {
   // main aber nicht zum Scroll-Container — sonst haftet die sticky Suchleiste
   // nicht am Fenster.
   return (
-    <main className="min-h-screen bg-[var(--background)] pb-28 relative overflow-clip transition-colors duration-300">
+    <main className="min-h-screen bg-[var(--background)] relative overflow-clip transition-colors duration-300">
       {/* Uebersicht bleibt gemountet (Scrollposition, Realtime), ist aber bei
           offener Vollbild-Notiz fuer Tastatur und Screenreader gesperrt. */}
-      <div inert={isNoteOpen && !isWide}>
+      {/* Ab 1024 px: links die Uebersicht (420 px), rechts die Notiz als Spalte. */}
+      <div className={isWide ? "mx-auto flex min-h-screen max-w-7xl" : undefined}>
+      <div inert={isNoteOpen && !isWide} className={isWide ? "w-[420px] shrink-0 pb-28" : "pb-28"}>
       {/* Dynamic ambient color glows */}
       <div className="absolute top-[-30%] right-[-10%] w-[600px] h-[600px] rounded-full blur-[140px] pointer-events-none" style={{ background: "var(--glow-a)" }} />
       <div className="absolute bottom-[-10%] left-[-20%] w-[600px] h-[600px] rounded-full blur-[140px] pointer-events-none" style={{ background: "var(--glow-b)" }} />
@@ -653,11 +655,16 @@ export default function HomeScreen() {
       </div>
 
       {/* FAB: tap = checklist, long-press = type picker */}
-      {!selecting && <FAB onCreateText={openText} onCreateChecklist={openChecklist} compact={fabCompact} />}
+      {!selecting && (
+        <FAB onCreateText={openText} onCreateChecklist={openChecklist} compact={fabCompact} anchor={isWide ? "column" : "screen"} />
+      )}
       </div>
 
       {/* Geoeffnete Notiz als eigenes Vollbild (Telefon) bzw. rechte Spalte (ab 1024 px).
-          Bestehende Notizen morphen aus ihrer Karte (shared element). */}
+          Bestehende Notizen morphen aus ihrer Karte (shared element). Der Rahmen
+          steht in beiden Modi an derselben Stelle im Baum, damit der Editor beim
+          Wechsel der Fensterbreite nicht neu gemountet wird. */}
+      <div className={isWide ? "sticky top-0 h-dvh min-w-0 flex-1 border-l border-[var(--border-color)]" : undefined}>
       <NoteScreen
         open={isNoteOpen}
         variant={isWide ? "pane" : "overlay"}
@@ -700,6 +707,35 @@ export default function HomeScreen() {
           />
         )}
       </NoteScreen>
+
+      {/* Rechte Spalte ohne offene Notiz: Platzhalter hinter dem (ausblendenden) NoteScreen */}
+      {isWide && (
+        <div inert={isNoteOpen} className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-6 text-center">
+          <div className="flex h-20 w-20 items-center justify-center rounded-3xl border border-primary/15 bg-primary/10 text-primary">
+            <FileText className="h-10 w-10" />
+          </div>
+          <h2 className="text-xl font-bold text-[var(--text-primary)]">Wähle eine Notiz</h2>
+          <p className="max-w-xs text-sm text-[var(--text-secondary)]">Oder lege eine neue an.</p>
+          <div className="flex flex-wrap justify-center gap-2">
+            <button
+              onClick={openChecklist}
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary-strong px-4 text-sm font-bold text-white cursor-pointer"
+            >
+              <ListTodo className="h-4 w-4" />
+              Neue Liste
+            </button>
+            <button
+              onClick={openText}
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--card-bg)] px-4 text-sm font-bold text-[var(--text-primary)] cursor-pointer"
+            >
+              <FileText className="h-4 w-4" />
+              Neue Notiz
+            </button>
+          </div>
+        </div>
+      )}
+      </div>
+      </div>
 
       {/* Global toast host (undo-delete, etc.) */}
       <Toast />

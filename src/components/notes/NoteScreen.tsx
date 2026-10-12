@@ -46,7 +46,7 @@ export default function NoteScreen({ open, layoutId, label, variant, children }:
   const className =
     variant === 'overlay'
       ? 'fixed inset-0 z-50 flex flex-col bg-[var(--background)]'
-      : 'sticky top-0 flex h-dvh min-w-0 flex-1 flex-col overflow-hidden border-l border-[var(--border-color)] bg-[var(--background)]';
+      : 'relative z-10 flex h-full min-w-0 flex-col overflow-hidden bg-[var(--background)]';
 
   return (
     <AnimatePresence>
