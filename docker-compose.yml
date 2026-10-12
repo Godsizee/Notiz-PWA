@@ -15,6 +15,9 @@ services:
       # Kommagetrennte Allowlist fuer /api/register. Leer oder nicht gesetzt =
       # Registrierung zu; Konten legt man dann im PocketBase-Admin an.
       - REGISTRATION_ALLOWED_EMAILS=${REGISTRATION_ALLOWED_EMAILS:-}
+      # Foto-Scan (optional, siehe .env.example). Laufzeit-Variablen, kein Build-Arg.
+      - N8N_SCAN_WEBHOOK_URL=${N8N_SCAN_WEBHOOK_URL:-}
+      - N8N_SCAN_WEBHOOK_KEY=${N8N_SCAN_WEBHOOK_KEY:-}
     depends_on:
       - pocketbase
     restart: always
