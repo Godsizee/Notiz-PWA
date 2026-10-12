@@ -374,7 +374,7 @@ export default function NoteEditor({ note, imagesByNote, onClose, onRequestDelet
       />
 
       {isAttaching && (
-        <div className="flex items-center gap-2 mb-3 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+        <div className="flex items-center gap-2 mb-3 text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
           <RefreshCw className="w-3 h-3 animate-spin text-primary" />
           Bild wird vorbereitet...
         </div>
@@ -408,7 +408,7 @@ export default function NoteEditor({ note, imagesByNote, onClose, onRequestDelet
       {/* Tactile URL Link Pills (Touch-first link interaction) */}
       {extractedLinks.length > 0 && (
         <div className="mt-8 pt-4 border-t border-[var(--border-color)]">
-          <p className="text-[10px] font-extrabold text-[var(--text-muted)] tracking-wider uppercase mb-3 flex items-center gap-1">
+          <p className="text-[11px] font-extrabold text-[var(--text-muted)] tracking-wider uppercase mb-3 flex items-center gap-1">
             <ExternalLink className="w-3.5 h-3.5" />
             Gefundene Links
           </p>
@@ -565,7 +565,7 @@ export default function NoteEditor({ note, imagesByNote, onClose, onRequestDelet
           {/* Save Status Indicator — below `xs` (foldable cover display) it
               sheds its chrome and shows the bare icon, to leave room for the
               extra toolbar slot. */}
-          <div className="shrink-0 flex items-center gap-1.5 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider rounded-full px-0 xs:px-2.5 py-1 xs:bg-[var(--background)]/50 xs:border xs:border-[var(--border-color)]">
+          <div className="shrink-0 flex items-center gap-1.5 text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider rounded-full px-0 xs:px-2.5 py-1 xs:bg-[var(--background)]/50 xs:border xs:border-[var(--border-color)]">
             {isSaving ? (
               <>
                 <RefreshCw className="w-3 h-3 animate-spin text-primary" />

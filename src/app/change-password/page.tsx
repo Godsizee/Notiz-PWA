@@ -112,12 +112,14 @@ export default function ChangePasswordPage() {
         {!success && (
           <form onSubmit={handleChangePassword} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="block text-sm font-semibold text-[var(--text-secondary)]">
+              <label htmlFor="old-password" className="block text-sm font-semibold text-[var(--text-secondary)]">
                 Aktuelles Passwort
               </label>
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
                 <input
+                  id="old-password"
+                  autoComplete="current-password"
                   type="password"
                   required
                   className="w-full pl-11 pr-4 py-3 bg-[var(--background)]/50 border border-[var(--border-color)] rounded-2xl focus:ring-2 focus:ring-primary focus:border-transparent focus:outline-none text-[var(--text-primary)] placeholder-•••••••• text-base"
@@ -131,12 +133,14 @@ export default function ChangePasswordPage() {
             <div className="h-[1px] bg-[var(--border-color)] my-4" />
 
             <div className="space-y-1.5">
-              <label className="block text-sm font-semibold text-[var(--text-secondary)]">
+              <label htmlFor="new-password" className="block text-sm font-semibold text-[var(--text-secondary)]">
                 Neues Passwort
               </label>
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
                 <input
+                  id="new-password"
+                  autoComplete="new-password"
                   type="password"
                   required
                   className="w-full pl-11 pr-4 py-3 bg-[var(--background)]/50 border border-[var(--border-color)] rounded-2xl focus:ring-2 focus:ring-primary focus:border-transparent focus:outline-none text-[var(--text-primary)] text-base"
@@ -148,12 +152,14 @@ export default function ChangePasswordPage() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="block text-sm font-semibold text-[var(--text-secondary)]">
+              <label htmlFor="new-password-confirm" className="block text-sm font-semibold text-[var(--text-secondary)]">
                 Neues Passwort bestätigen
               </label>
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
                 <input
+                  id="new-password-confirm"
+                  autoComplete="new-password"
                   type="password"
                   required
                   className="w-full pl-11 pr-4 py-3 bg-[var(--background)]/50 border border-[var(--border-color)] rounded-2xl focus:ring-2 focus:ring-primary focus:border-transparent focus:outline-none text-[var(--text-primary)] text-base"

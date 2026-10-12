@@ -193,12 +193,15 @@ export default function LoginPage() {
               className="space-y-6"
             >
               <div className="space-y-2">
-                <label className="block text-sm font-semibold text-[var(--text-secondary)]">
+                <label htmlFor="login-email" className="block text-sm font-semibold text-[var(--text-secondary)]">
                   E-Mail-Adresse
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-muted)]" />
                   <input
+                    id="login-email"
+                    autoComplete="email"
+                    inputMode="email"
                     type="email"
                     required
                     className="w-full pl-12 pr-4 py-3.5 bg-[var(--background)]/50 border border-[var(--border-color)] rounded-2xl focus:ring-2 focus:ring-primary focus:border-transparent focus:outline-none text-[var(--text-primary)] placeholder-[var(--text-muted)]/50 text-base"
@@ -210,12 +213,14 @@ export default function LoginPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="block text-sm font-semibold text-[var(--text-secondary)]">
+                <label htmlFor="login-password" className="block text-sm font-semibold text-[var(--text-secondary)]">
                   Passwort
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-muted)]" />
                   <input
+                    id="login-password"
+                    autoComplete="current-password"
                     type="password"
                     required
                     className="w-full pl-12 pr-4 py-3.5 bg-[var(--background)]/50 border border-[var(--border-color)] rounded-2xl focus:ring-2 focus:ring-primary focus:border-transparent focus:outline-none text-[var(--text-primary)] text-base"
@@ -257,12 +262,15 @@ export default function LoginPage() {
               className="space-y-5"
             >
               <div className="space-y-2">
-                <label className="block text-sm font-semibold text-[var(--text-secondary)]">
+                <label htmlFor="register-email" className="block text-sm font-semibold text-[var(--text-secondary)]">
                   E-Mail-Adresse
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-muted)]" />
                   <input
+                    id="register-email"
+                    autoComplete="email"
+                    inputMode="email"
                     type="email"
                     required
                     className="w-full pl-12 pr-4 py-3.5 bg-[var(--background)]/50 border border-[var(--border-color)] rounded-2xl focus:ring-2 focus:ring-primary focus:border-transparent focus:outline-none text-[var(--text-primary)] placeholder-[var(--text-muted)]/50 text-base"
@@ -274,12 +282,14 @@ export default function LoginPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="block text-sm font-semibold text-[var(--text-secondary)]">
+                <label htmlFor="register-password" className="block text-sm font-semibold text-[var(--text-secondary)]">
                   Passwort
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-muted)]" />
                   <input
+                    id="register-password"
+                    autoComplete="new-password"
                     type="password"
                     required
                     minLength={8}
@@ -292,12 +302,14 @@ export default function LoginPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="block text-sm font-semibold text-[var(--text-secondary)]">
+                <label htmlFor="register-password-confirm" className="block text-sm font-semibold text-[var(--text-secondary)]">
                   Passwort bestätigen
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-muted)]" />
                   <input
+                    id="register-password-confirm"
+                    autoComplete="new-password"
                     type="password"
                     required
                     minLength={8}

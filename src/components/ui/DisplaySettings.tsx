@@ -78,7 +78,7 @@ export default function DisplaySettings() {
               className="absolute right-0 top-11 z-50 w-56 rounded-2xl surface p-3 shadow-[var(--shadow-elevated)]"
             >
               {/* Font size */}
-              <p className="text-[10px] font-extrabold text-[var(--text-muted)] tracking-widest uppercase mb-2 pl-1">
+              <p className="text-[11px] font-extrabold text-[var(--text-muted)] tracking-widest uppercase mb-2 pl-1">
                 Textgröße
               </p>
               <div className="flex gap-1.5 mb-3">
@@ -104,7 +104,7 @@ export default function DisplaySettings() {
               </div>
 
               {/* View mode */}
-              <p className="text-[10px] font-extrabold text-[var(--text-muted)] tracking-widest uppercase mb-2 pl-1">
+              <p className="text-[11px] font-extrabold text-[var(--text-muted)] tracking-widest uppercase mb-2 pl-1">
                 Ansicht
               </p>
               <div className="flex gap-1.5">
@@ -131,7 +131,7 @@ export default function DisplaySettings() {
               </div>
 
               {/* Backup / Export */}
-              <p className="text-[10px] font-extrabold text-[var(--text-muted)] tracking-widest uppercase mb-2 mt-3 pl-1 flex items-center gap-1">
+              <p className="text-[11px] font-extrabold text-[var(--text-muted)] tracking-widest uppercase mb-2 mt-3 pl-1 flex items-center gap-1">
                 <Download className="w-3 h-3" />
                 Backup
               </p>

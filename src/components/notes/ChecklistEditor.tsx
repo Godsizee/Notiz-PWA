@@ -920,14 +920,14 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
                     <div
                       key={p.id}
                       title={`${email} bearbeitet gerade`}
-                      className="w-6 h-6 rounded-full bg-gradient-to-tr from-primary to-purple-500 text-white flex items-center justify-center text-[10px] font-bold border border-[var(--card-bg)] shadow-sm"
+                      className="w-6 h-6 rounded-full bg-gradient-to-tr from-primary to-purple-500 text-white flex items-center justify-center text-[11px] font-bold border border-[var(--card-bg)] shadow-sm"
                     >
                       {email[0]?.toUpperCase()}
                     </div>
                   );
                 })}
               </div>
-              <span className="flex items-center gap-1.5 text-[10px] font-bold text-green-500 uppercase tracking-wider">
+              <span className="flex items-center gap-1.5 text-[11px] font-bold text-green-500 uppercase tracking-wider">
                 <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
                 Bearbeitet gerade
               </span>
@@ -1025,7 +1025,7 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
         {/* Completed Items Section */}
         {completedItems.length > 0 && (
           <div className="mt-8 pt-4">
-            <h4 className="text-[10px] font-extrabold text-[var(--text-muted)] tracking-widest uppercase mb-3 flex items-center gap-2">
+            <h4 className="text-[11px] font-extrabold text-[var(--text-muted)] tracking-widest uppercase mb-3 flex items-center gap-2">
               <span className="h-[1px] flex-1 bg-[var(--border-color)]"></span>
               Erledigt ({completedItems.length})
               <span className="h-[1px] flex-1 bg-[var(--border-color)]"></span>
@@ -1168,7 +1168,7 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
         <div className="flex items-center gap-1 sm:gap-3 relative">
 
           {/* Save status — collapses to an icon on very narrow screens */}
-          <div className="hidden xs:flex items-center gap-1.5 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider bg-[var(--background)]/50 px-2.5 py-1 rounded-full border border-[var(--border-color)]">
+          <div className="hidden xs:flex items-center gap-1.5 text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider bg-[var(--background)]/50 px-2.5 py-1 rounded-full border border-[var(--border-color)]">
             {isSaving ? (
               <>
                 <RefreshCw className="w-3 h-3 animate-spin text-primary" />

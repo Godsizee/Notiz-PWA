@@ -189,7 +189,7 @@ export default function NoteCard({
             <div className="shrink-0 flex flex-col items-end gap-1">
               {note.is_shared && <Users className="w-3.5 h-3.5 text-primary/80" />}
               {(note.updated || note.created) && (
-                <span className="text-[9px] text-[var(--text-muted)]">
+                <span className="text-[11px] text-[var(--text-muted)]">
                   {formatRelative(note.updated || note.created)}
                 </span>
               )}
@@ -213,7 +213,7 @@ export default function NoteCard({
             {note.title}
           </h3>
         ) : (
-          <div className="flex items-center gap-1.5 text-[10px] font-bold tracking-wider text-[var(--text-muted)] uppercase mb-3.5">
+          <div className="flex items-center gap-1.5 text-[11px] font-bold tracking-wider text-[var(--text-muted)] uppercase mb-3.5">
             {note.type === 'checklist' ? (
               <>
                 <ListTodo className="w-3 h-3" />
@@ -252,7 +252,7 @@ export default function NoteCard({
                     if (quantity) {
                       return (
                         <>
-                          <span className={`px-1 py-0.5 rounded text-[10px] font-bold bg-[var(--text-primary)]/8 text-[var(--text-secondary)] border border-[var(--border-color)] shrink-0 ${item.is_completed ? 'opacity-50' : ''}`}>
+                          <span className={`px-1 py-0.5 rounded text-[11px] font-bold bg-[var(--text-primary)]/8 text-[var(--text-secondary)] border border-[var(--border-color)] shrink-0 ${item.is_completed ? 'opacity-50' : ''}`}>
                             {quantity}
                           </span>
                           <span className="truncate">{restText}</span>
@@ -268,7 +268,7 @@ export default function NoteCard({
             {items.length > 5 && (
               <div className="pt-2.5 flex items-center gap-2">
                 <div className="h-[1px] flex-1 bg-[var(--border-color)]"></div>
-                <p className="text-[9px] font-extrabold text-[var(--text-muted)] uppercase tracking-widest bg-background/50 px-2 py-0.5 rounded-full border border-[var(--border-color)]">
+                <p className="text-[11px] font-extrabold text-[var(--text-muted)] uppercase tracking-widest bg-background/50 px-2 py-0.5 rounded-full border border-[var(--border-color)]">
                   + {items.length - 5} weitere
                 </p>
                 <div className="h-[1px] flex-1 bg-[var(--border-color)]"></div>
@@ -287,7 +287,7 @@ export default function NoteCard({
         {(note.updated || note.created || note.is_shared) && (
           <div className="mt-3 flex items-center justify-between gap-2">
             {note.is_shared ? (
-              <span className="flex items-center gap-1 text-[9px] font-bold text-primary/80 uppercase tracking-wider">
+              <span className="flex items-center gap-1 text-[11px] font-bold text-primary/80 uppercase tracking-wider">
                 <Users className="w-3 h-3" />
                 Geteilt
               </span>
@@ -295,7 +295,7 @@ export default function NoteCard({
               <span />
             )}
             {(note.updated || note.created) && (
-              <p className="text-[9px] text-[var(--text-muted)]">
+              <p className="text-[11px] text-[var(--text-muted)]">
                 {formatRelative(note.updated || note.created)}
               </p>
             )}

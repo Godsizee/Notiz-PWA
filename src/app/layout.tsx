@@ -1,8 +1,21 @@
 import type { Metadata, Viewport } from "next";
+import { Outfit } from "next/font/google";
 import { SerwistProvider } from "@serwist/turbopack/react";
 import "./globals.css";
 import PwaUpdateReload from "@/components/PwaUpdateReload";
 import PwaFullscreen from "@/components/PwaFullscreen";
+import MotionProvider from "@/components/MotionProvider";
+
+// Selbst gehostet: next/font laedt die Dateien zur Buildzeit und liefert sie
+// von der eigenen Origin aus. Der fruehere @import von fonts.googleapis.com in
+// globals.css wurde von der eigenen CSP (style-src 'self') blockiert — die App
+// lief in Produktion also nie in Outfit, und offline erst recht nicht.
+const outfit = Outfit({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700", "800"],
+  display: "swap",
+  variable: "--font-outfit",
+});
 
 export const metadata: Metadata = {
   title: "B&B Notes",
@@ -26,8 +39,10 @@ export const viewport: Viewport = {
   // so the status bar follows the active theme and the opened note's color.
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  // Kein maximumScale/userScalable mehr: eine Zoomsperre verstoesst gegen
+  // WCAG 1.4.4. Eingabefelder haben mind. 16 px, damit iOS beim Fokussieren
+  // nicht von selbst zoomt; Doppeltipp-Zoom auf Knoepfen verhindert bereits
+  // `touch-action: manipulation` in globals.css.
   viewportFit: "cover",
 };
 
@@ -65,7 +80,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="de" className="scroll-smooth" suppressHydrationWarning>
+    <html lang="de" className={`scroll-smooth ${outfit.variable}`} suppressHydrationWarning>
       <head>
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="mobile-web-app-capable" content="yes" />
@@ -80,11 +95,13 @@ export default function RootLayout({
           disable={process.env.NODE_ENV === "development"}
           reloadOnOnline={false}
         >
-          <PwaUpdateReload />
-          <PwaFullscreen />
-          <div className="mx-auto max-w-4xl relative min-h-screen">
-            {children}
-          </div>
+          <MotionProvider>
+            <PwaUpdateReload />
+            <PwaFullscreen />
+            <div className="mx-auto max-w-4xl relative min-h-screen">
+              {children}
+            </div>
+          </MotionProvider>
         </SerwistProvider>
       </body>
     </html>

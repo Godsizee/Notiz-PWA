@@ -406,7 +406,7 @@ export default function ImageViewer({
         {zoomed && (
           <button
             onClick={resetZoom}
-            className="absolute left-1/2 -translate-x-1/2 bottom-24 text-[10px] font-bold uppercase tracking-widest text-white/60 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md cursor-pointer"
+            className="absolute left-1/2 -translate-x-1/2 bottom-24 text-[11px] font-bold uppercase tracking-widest text-white/60 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md cursor-pointer"
           >
             Zoom zurücksetzen
           </button>

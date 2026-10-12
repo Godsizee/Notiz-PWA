@@ -96,7 +96,7 @@ export default function Header({ searchQuery = "", onSearchChange }: HeaderProps
               B&amp;B Notes
             </h1>
             {userEmail && (
-              <p className="hidden xs:block text-[10px] font-bold text-[var(--text-muted)] tracking-wider uppercase -mt-0.5 truncate">
+              <p className="hidden xs:block text-[11px] font-bold text-[var(--text-muted)] tracking-wider uppercase -mt-0.5 truncate">
                 Meine &amp; geteilte Notizen
               </p>
             )}
@@ -114,7 +114,7 @@ export default function Header({ searchQuery = "", onSearchChange }: HeaderProps
               title={syncTitle}
             >
               <CloudOff className="w-4.5 h-4.5 text-amber-500" />
-              <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-amber-500 text-white text-[9px] font-bold flex items-center justify-center">
+              <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-amber-500 text-white text-[11px] font-bold flex items-center justify-center">
                 {deadLetterCount}
               </span>
             </button>
@@ -131,7 +131,7 @@ export default function Header({ searchQuery = "", onSearchChange }: HeaderProps
                 <Cloud className="w-4.5 h-4.5 text-[var(--text-muted)]" />
               )}
               {pendingCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-amber-500 text-white text-[9px] font-bold flex items-center justify-center">
+                <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-amber-500 text-white text-[11px] font-bold flex items-center justify-center">
                   {pendingCount}
                 </span>
               )}
@@ -206,7 +206,7 @@ export default function Header({ searchQuery = "", onSearchChange }: HeaderProps
                   if (e.key === "Escape") closeSearch();
                 }}
                 placeholder="Titel, Inhalt und Checklisten durchsuchen..."
-                className="flex-1 bg-transparent border-none outline-none text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)]/50 py-1.5 min-w-0"
+                className="flex-1 bg-transparent border-none outline-none text-base text-[var(--text-primary)] placeholder-[var(--text-muted)]/50 py-1.5 min-w-0"
               />
               <button
                 onClick={() => (searchQuery ? onSearchChange("") : closeSearch())}
