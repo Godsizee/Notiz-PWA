@@ -24,6 +24,8 @@ const UNDO_DELETE_MS = 5000;
 interface ChecklistEditorProps {
   note?: RecordModel | null;
   onClose: () => void;
+  /** Eine neue Liste wurde zum ersten Mal gespeichert (HomeScreen stellt die URL um). */
+  onCreated?: (id: string) => void;
   /** When provided, deleting routes through the app's soft-delete + undo toast. */
   onRequestDelete?: (noteId: string) => void;
 }
@@ -283,7 +285,7 @@ const ActiveChecklistList = memo(function ActiveChecklistList({
   );
 });
 
-export default function ChecklistEditor({ note, onClose, onRequestDelete }: ChecklistEditorProps) {
+export default function ChecklistEditor({ note, onClose, onCreated, onRequestDelete }: ChecklistEditorProps) {
   const [title, setTitle] = useState(note?.title || '');
   const [color, setColor] = useState(note?.color || 'white');
   const [isPinned, setIsPinned] = useState(note?.is_pinned || false);
@@ -327,6 +329,10 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
   const [confettiKey, setConfettiKey] = useState(0);
 
   const { items, setItems, setSyncSuspended } = useRealtimeChecklist(activeNoteId || '');
+  // performSave/ensureNoteExists sind stabile Callbacks — den aktuellen
+  // onCreated deshalb ueber eine Ref lesen.
+  const onCreatedRef = useRef(onCreated);
+  useEffect(() => { onCreatedRef.current = onCreated; }, [onCreated]);
   const { others } = usePresence(activeNoteId);
   const showToast = useToastStore((s) => s.showToast);
 
@@ -426,6 +432,7 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
         });
         activeNoteIdRef.current = record.id;
         setActiveNoteId(record.id);
+        onCreatedRef.current?.(record.id);
       }
     } catch (err) {
       console.error("Failed to auto-save checklist:", err);
@@ -493,6 +500,7 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
     });
     activeNoteIdRef.current = record.id;
     setActiveNoteId(record.id);
+    onCreatedRef.current?.(record.id);
     return record.id;
   }, []);
 

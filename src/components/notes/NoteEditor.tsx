@@ -21,11 +21,13 @@ interface NoteEditorProps {
    */
   imagesByNote?: ImagesByNote;
   onClose: () => void;
+  /** Eine neue Notiz wurde zum ersten Mal gespeichert (HomeScreen stellt die URL um). */
+  onCreated?: (id: string) => void;
   /** When provided, deleting routes through the app's soft-delete + undo toast. */
   onRequestDelete?: (noteId: string) => void;
 }
 
-export default function NoteEditor({ note, imagesByNote, onClose, onRequestDelete }: NoteEditorProps) {
+export default function NoteEditor({ note, imagesByNote, onClose, onCreated, onRequestDelete }: NoteEditorProps) {
   const [title, setTitle] = useState(note?.title || '');
   const [content, setContent] = useState(note?.content || '');
   const [color, setColor] = useState(note?.color || 'white');
@@ -42,6 +44,9 @@ export default function NoteEditor({ note, imagesByNote, onClose, onRequestDelet
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const showToast = useToastStore((s) => s.showToast);
+  // ensureNoteId/performSave sind stabile Callbacks — onCreated ueber eine Ref lesen.
+  const onCreatedRef = useRef(onCreated);
+  useEffect(() => { onCreatedRef.current = onCreated; }, [onCreated]);
   const isOnline = useSyncStore((s) => s.isOnline);
 
   // Track active ID to differentiate between updates and first-time creation
@@ -153,6 +158,7 @@ export default function NoteEditor({ note, imagesByNote, onClose, onRequestDelet
     });
     activeNoteIdRef.current = record.id;
     setActiveNoteId(record.id);
+    onCreatedRef.current?.(record.id);
     return record.id;
   }, [newNoteData]);
 
@@ -177,6 +183,7 @@ export default function NoteEditor({ note, imagesByNote, onClose, onRequestDelet
         });
         activeNoteIdRef.current = record.id;
         setActiveNoteId(record.id);
+        onCreatedRef.current?.(record.id);
       }
     } catch (err) {
       console.error("Failed to auto-save note:", err);

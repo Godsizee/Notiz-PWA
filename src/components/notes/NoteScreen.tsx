@@ -3,7 +3,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// Vollbild-Ansicht einer geoeffneten Notiz. Ersetzt die BottomSheet: kein
+// Vollbild-Ansicht einer geoeffneten Notiz. Ersetzt das fruehere Bottom-Sheet: kein
 // Hintergrund zum Danebentippen, kein Griff zum versehentlichen Wegziehen —
 // genau die Fehlbedienungen, die die Sheet hatte. Geschlossen wird nur ueber
 // den Zurueck-Pfeil, die System-Zurueck-Geste (popstate) oder Escape.

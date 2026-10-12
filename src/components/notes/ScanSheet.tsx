@@ -15,9 +15,9 @@ import { hapticLight } from '@/lib/haptics';
 // und zeigt die Vorschlaege zur Pruefung, bevor irgendetwas in der Liste
 // landet. Geschrieben wird erst ueber onCommit (ChecklistEditor).
 //
-// Per Portal an <body>: der Editor sitzt in der BottomSheet, deren
-// motion.div per transform animiert wird — ein position:fixed-Kind wuerde
-// sonst relativ zu dieser Sheet statt zum Viewport positioniert.
+// Per Portal an <body>: der Editor sitzt im NoteScreen, dessen motion.div per
+// transform animiert wird — ein position:fixed-Kind wuerde sonst relativ zu
+// diesem Container statt zum Viewport positioniert.
 
 type Phase =
   | { kind: 'preparing' }
