@@ -37,9 +37,16 @@ export function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
   const isAuthRoute = pathname === '/login' || pathname === '/change-password';
+  // "/" und "/~offline" sind vorgerenderte Huellen ohne Nutzerdaten (die Notizen
+  // laedt der Client nach der Anmeldung; ohne Sitzung leitet HomeScreen selbst auf
+  // /login). Der Service Worker precacht beide beim Installieren — meist beim
+  // ersten Besuch, also ausgeloggt. Haette der Proxy sie dann auf /login
+  // umgeleitet, laege die Login-Seite im Precache und wuerde offline statt der App
+  // gezeigt (Plan UI-Overhaul B.6 #2, am echten Service Worker nachgemessen).
+  const isPublicShell = pathname === '/' || pathname === '/~offline';
 
   // 1. Not Authenticated: redirect to login
-  if (!isValid && !isAuthRoute && !pathname.startsWith('/api/') && !pathname.startsWith('/_next/') && pathname !== '/manifest.json') {
+  if (!isValid && !isAuthRoute && !isPublicShell && !pathname.startsWith('/api/') && !pathname.startsWith('/_next/') && pathname !== '/manifest.json') {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
