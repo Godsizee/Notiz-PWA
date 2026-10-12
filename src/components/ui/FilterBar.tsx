@@ -4,13 +4,14 @@ import { motion } from 'framer-motion';
 import { getNoteColorStyles } from '@/lib/colors';
 import { hapticLight } from '@/lib/haptics';
 
-export type NoteFilter = 'all' | 'text' | 'checklist' | 'archived';
+export type NoteFilter = 'all' | 'checklist' | 'text' | 'shared' | 'archived';
 
 const FILTERS: { id: NoteFilter; label: string }[] = [
   { id: 'all', label: 'Alle' },
+  { id: 'checklist', label: 'Listen' },
   { id: 'text', label: 'Notizen' },
-  { id: 'checklist', label: 'Checklisten' },
-  { id: 'archived', label: 'Archiviert' },
+  { id: 'shared', label: 'Geteilt' },
+  { id: 'archived', label: 'Archiv' },
 ];
 
 interface FilterBarProps {

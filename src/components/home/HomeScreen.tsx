@@ -324,6 +324,7 @@ export default function HomeScreen() {
       if (searchTerm) return true;
       if (activeFilter === "archived") return n.is_archived;
       if (n.is_archived) return false;
+      if (activeFilter === "shared") return n.is_shared;
       if (activeFilter === "text") return n.type === "text";
       if (activeFilter === "checklist") return n.type === "checklist";
       return true;
