@@ -21,7 +21,7 @@ function isOfflineError(err: unknown): boolean {
 // Shared reducer for realtime echoes AND local offline changes. Creates are
 // deduped because an offline-created record can arrive twice (optimistic
 // local event + realtime echo after the queue flush).
-function applyEvent(
+export function applyEvent(
   prev: RecordModel[],
   action: string,
   record: RecordModel,
@@ -48,7 +48,7 @@ function applyEvent(
   return sort ? next.sort(sort) : next;
 }
 
-const byOrder = (a: RecordModel, b: RecordModel) => (a.order ?? 0) - (b.order ?? 0);
+export const byOrder = (a: RecordModel, b: RecordModel) => (a.order ?? 0) - (b.order ?? 0);
 
 export function useRealtimeNotes() {
   const [notes, setNotes] = useState<RecordModel[]>([]);

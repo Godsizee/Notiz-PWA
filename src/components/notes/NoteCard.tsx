@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import { RecordModel } from 'pocketbase';
 import { Pin, Circle, CheckCircle2, ListTodo, FileText, Archive, ArchiveRestore, Users } from 'lucide-react';
-import { useRealtimeChecklist } from '@/lib/useRealtime';
+import { useChecklistPreview } from '@/lib/useChecklistPreview';
 import { motion, useMotionValue, useTransform, type PanInfo } from 'framer-motion';
 import { getNoteColorStyles } from '@/lib/colors';
 import { hapticMedium } from '@/lib/haptics';
@@ -45,7 +45,8 @@ export default function NoteCard({
   onDelete,
   layout = 'grid',
 }: NoteCardProps) {
-  const { items } = useRealtimeChecklist(note.type === 'checklist' ? note.id : '');
+  // Aus dem gemeinsamen Store der Uebersicht statt eigener Abfrage je Karte.
+  const items = useChecklistPreview(note.type === 'checklist' ? note.id : '');
   const colorStyles = getNoteColorStyles(note.color);
   const isList = layout === 'list';
   const completedCount = items.filter((i) => i.is_completed).length;

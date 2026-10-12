@@ -7,6 +7,7 @@ import { RecordModel } from "pocketbase";
 import { pb, isOwnedByMe } from "@/lib/pb";
 import { useRealtimeNotes, useRealtimeImages } from "@/lib/useRealtime";
 import { useChecklistSearchIndex } from "@/lib/useSearch";
+import { useChecklistPreviewSync } from "@/lib/useChecklistPreview";
 import { applyChange } from "@/lib/sync";
 import { useKeyboardShortcuts } from "@/lib/useKeyboardShortcuts";
 import { useToastStore } from "@/store/useToastStore";
@@ -46,6 +47,8 @@ export default function HomeScreen() {
   const { notes, isLoading, refetch } = useRealtimeNotes();
   // Loaded once for the whole overview rather than per card — see the hook.
   const imagesByNote = useRealtimeImages();
+  // Eintraege aller Listen fuer die Kartenvorschau: ein Request, ein Abo.
+  useChecklistPreviewSync();
   const router = useRouter();
   const showToast = useToastStore((s) => s.showToast);
   const viewMode = usePreferencesStore((s) => s.viewMode);
