@@ -38,6 +38,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Test
+        run: npm test
+
   build-and-push:
     # Nur bauen, wenn die Pruefung durch ist, und nur bei Pushes (master, beta) —
     # Pull Requests laufen bis 'verify' und pushen kein Image.

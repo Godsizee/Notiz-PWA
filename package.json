@@ -13,7 +13,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "eval:scan": "node --env-file=.env node_modules/vitest/vitest.mjs run src/lib/scan/scan.eval.test.ts"
   },
   "dependencies": {
     "framer-motion": "^12.43.0",
@@ -36,7 +38,8 @@
     "eslint-config-next": "16.4.0",
     "serwist": "^9.5.13",
     "tailwindcss": "^4.3.3",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^5.0.3"
   },
   "engines": {
     "node": ">=24"
