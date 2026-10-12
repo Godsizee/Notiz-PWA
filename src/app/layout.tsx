@@ -3,7 +3,6 @@ import { Outfit } from "next/font/google";
 import { SerwistProvider } from "@serwist/turbopack/react";
 import "./globals.css";
 import PwaUpdateReload from "@/components/PwaUpdateReload";
-import PwaFullscreen from "@/components/PwaFullscreen";
 import MotionProvider from "@/components/MotionProvider";
 
 // Selbst gehostet: next/font laedt die Dateien zur Buildzeit und liefert sie
@@ -97,7 +96,6 @@ export default function RootLayout({
         >
           <MotionProvider>
             <PwaUpdateReload />
-            <PwaFullscreen />
             <div className="mx-auto max-w-4xl relative min-h-screen">
               {children}
             </div>
