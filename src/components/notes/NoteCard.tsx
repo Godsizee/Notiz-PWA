@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { RecordModel } from 'pocketbase';
 import { Pin, Circle, CheckCircle2, ListTodo, FileText, Archive, ArchiveRestore, Users } from 'lucide-react';
 import { useChecklistPreview } from '@/lib/useChecklistPreview';
+import { useIsSelected, useSelectionActive, useSelectionStore } from '@/store/useSelectionStore';
 import { motion, useMotionValue, useTransform, type PanInfo } from 'framer-motion';
 import { getNoteColorStyles } from '@/lib/colors';
 import { hapticMedium } from '@/lib/haptics';
@@ -48,6 +49,10 @@ export default function NoteCard({
   // Aus dem gemeinsamen Store der Uebersicht statt eigener Abfrage je Karte.
   const items = useChecklistPreview(note.type === 'checklist' ? note.id : '');
   const colorStyles = getNoteColorStyles(note.color);
+  // Mehrfachauswahl (Store, damit nur die betroffene Karte neu rendert).
+  const selected = useIsSelected(note.id);
+  const selecting = useSelectionActive();
+  const toggleSelected = useSelectionStore((s) => s.toggle);
   const isList = layout === 'list';
   const completedCount = items.filter((i) => i.is_completed).length;
 
@@ -61,6 +66,9 @@ export default function NoteCard({
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressFired = useRef(false);
   const pressStart = useRef<{ x: number; y: number } | null>(null);
+  // Android-Chrome feuert contextmenu auch bei Long-Press auf Touch; das
+  // Kontextmenue gehoert aber nur zur Maus (Rechtsklick), Touch waehlt aus.
+  const pointerTypeRef = useRef('mouse');
 
   const visibleItems = items.slice(0, MAX_PREVIEW_ITEMS);
   const openCount = items.length - completedCount;
@@ -74,12 +82,13 @@ export default function NoteCard({
 
   const handlePointerDown = (e: React.PointerEvent) => {
     longPressFired.current = false;
+    pointerTypeRef.current = e.pointerType;
     pressStart.current = { x: e.clientX, y: e.clientY };
     clearLongPress();
     longPressTimer.current = setTimeout(() => {
       longPressFired.current = true;
       hapticMedium();
-      setMenuPos({ x: e.clientX, y: e.clientY });
+      toggleSelected(note.id);
     }, LONG_PRESS_MS);
   };
 
@@ -90,10 +99,16 @@ export default function NoteCard({
     if (dx > MOVE_TOLERANCE || dy > MOVE_TOLERANCE) clearLongPress();
   };
 
-  const handleClick = () => {
+  const handleClick = (e: React.MouseEvent) => {
     // Suppress the open-tap that follows a long-press.
     if (longPressFired.current) {
       longPressFired.current = false;
+      return;
+    }
+    // Waehrend einer Auswahl waehlt jeder Tipp aus/ab; Strg/Cmd-Klick startet
+    // sie am Desktop.
+    if (selecting || e.ctrlKey || e.metaKey) {
+      toggleSelected(note.id);
       return;
     }
     onClick();
@@ -138,7 +153,7 @@ export default function NoteCard({
         initial={{ opacity: 0, scale: 0.95, y: 15 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         whileTap={{ scale: 0.98 }}
-        drag="x"
+        drag={selecting ? false : 'x'}
         dragConstraints={{ left: 0, right: 0 }}
         dragElastic={0.7}
         onDragEnd={handleDragEnd}
@@ -147,24 +162,33 @@ export default function NoteCard({
         onPointerUp={clearLongPress}
         onClick={handleClick}
         role="button"
+        aria-pressed={selecting ? selected : undefined}
         tabIndex={0}
         aria-label={note.title || (note.type === 'checklist' ? 'Unbenannte Liste' : 'Unbenannte Notiz')}
         onKeyDown={(e) => {
           if (e.target !== e.currentTarget) return;
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
-            onClick();
+            if (selecting) toggleSelected(note.id);
+            else onClick();
           }
         }}
         onContextMenu={(e) => {
           e.preventDefault();
-          setMenuPos({ x: e.clientX, y: e.clientY });
+          if (pointerTypeRef.current === 'mouse') setMenuPos({ x: e.clientX, y: e.clientY });
         }}
-        className={`cursor-pointer border shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-elevated)] transition-shadow duration-300 relative overflow-hidden group select-none ${colorStyles.bg} ${
+        className={`cursor-pointer border shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-elevated)] transition-shadow duration-300 relative overflow-hidden group select-none ${colorStyles.bg} ${selected ? 'ring-2 ring-primary ring-offset-2 ring-offset-[var(--background)]' : ''} ${
           isList ? 'rounded-2xl p-3.5 flex items-center gap-3' : 'rounded-2xl p-3.5'
         }`}
         style={{ x, ...colorStyles.style }}
       >
+        {/* Haken der Mehrfachauswahl (oben rechts, wie in Keep) */}
+        {selected && (
+          <span className="pointer-events-none absolute right-2.5 top-2.5 z-20 rounded-full bg-[var(--card-bg)]" aria-hidden="true">
+            <CheckCircle2 className="h-6 w-6 text-primary fill-current [&>path:last-child]:stroke-white" />
+          </span>
+        )}
+
         {/* Glow Effect on Hover */}
         <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
 
@@ -214,7 +238,7 @@ export default function NoteCard({
 
         {/* Pin Icon */}
         {note.is_pinned && (
-          <div className="absolute top-3.5 right-3.5 p-1.5 bg-[var(--card-bg)]/70 backdrop-blur-md rounded-lg text-primary shadow-sm border border-[var(--border-color)] z-10 transition-transform group-hover:scale-110">
+          <div className={`absolute top-3.5 p-1.5 ${selected ? 'right-12' : 'right-3.5'} bg-[var(--card-bg)]/70 backdrop-blur-md rounded-lg text-primary shadow-sm border border-[var(--border-color)] z-10 transition-transform group-hover:scale-110`}>
             <Pin className="w-3.5 h-3.5 fill-current" />
           </div>
         )}

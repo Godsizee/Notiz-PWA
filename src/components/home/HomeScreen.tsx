@@ -27,6 +27,9 @@ import NoteEditor from "@/components/notes/NoteEditor";
 import ChecklistEditor from "@/components/notes/ChecklistEditor";
 import { Layout, SearchX } from "lucide-react";
 import HomeTopBar from "@/components/home/HomeTopBar";
+import SelectionBar from "@/components/home/SelectionBar";
+import { useSelectionActive, useSelectionStore } from "@/store/useSelectionStore";
+import { useSelectionHistory } from "@/lib/useSelectionHistory";
 import { motion } from "framer-motion";
 import { useNoteRoute } from "@/lib/useNoteRoute";
 import { adoptCreatedId, resolveSession, type SessionState } from "@/lib/noteRoute";
@@ -74,6 +77,17 @@ export default function HomeScreen() {
   // Soft-delete: ids hidden from the UI while their undo window is open.
   const [pendingDeleteIds, setPendingDeleteIds] = useState<Set<string>>(new Set());
   const deleteTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  // Mehrfachauswahl (lange druecken). Zurueck/Escape/✕ beenden sie, siehe
+  // useSelectionHistory; ausgewaehlte, inzwischen verschwundene Notizen zaehlen nicht.
+  const { exit: exitSelection } = useSelectionHistory();
+  const selecting = useSelectionActive();
+  const selectedIds = useSelectionStore((s) => s.ids);
+  const selectedNotes = notes.filter((n) => selectedIds.has(n.id) && !pendingDeleteIds.has(n.id));
+  const selectedCount = selectedNotes.length;
+  useEffect(() => {
+    if (selecting && !isLoading && selectedCount === 0) exitSelection();
+  }, [selecting, isLoading, selectedCount, exitSelection]);
 
   // Auth check
   useEffect(() => {
@@ -237,45 +251,157 @@ export default function HomeScreen() {
     }
   };
 
-  // Soft-delete with a 5s undo window before the real PocketBase delete.
-  const requestDeleteNote = (noteId: string) => {
+  // Soft-delete with a 5s undo window before the real PocketBase delete. Mehrere
+  // Notizen (Mehrfachauswahl) teilen sich eine Snackbar und ein Rueckgaengig.
+  const requestDeleteNotes = (noteIds: string[], message?: string) => {
     hapticHeavy();
-    setPendingDeleteIds((prev) => new Set(prev).add(noteId));
+    setPendingDeleteIds((prev) => new Set([...prev, ...noteIds]));
 
-    const timer = setTimeout(async () => {
-      try {
-        await applyChange({ collection: "notes", action: "delete", id: noteId });
-      } catch (err) {
-        console.error("Failed to delete note:", err);
-      }
-      delete deleteTimers.current[noteId];
+    const unpend = (id: string) =>
       setPendingDeleteIds((prev) => {
         const next = new Set(prev);
-        next.delete(noteId);
+        next.delete(id);
         return next;
       });
-    }, UNDO_DELETE_MS);
-    deleteTimers.current[noteId] = timer;
+
+    for (const noteId of noteIds) {
+      deleteTimers.current[noteId] = setTimeout(async () => {
+        try {
+          await applyChange({ collection: "notes", action: "delete", id: noteId });
+        } catch (err) {
+          console.error("Failed to delete note:", err);
+        }
+        delete deleteTimers.current[noteId];
+        unpend(noteId);
+      }, UNDO_DELETE_MS);
+    }
 
     showToast({
-      message: "Notiz gelöscht",
+      message: message ?? (noteIds.length === 1 ? "Notiz gelöscht" : `${noteIds.length} Notizen gelöscht`),
       actionLabel: "Rückgängig",
       tone: "danger",
       duration: UNDO_DELETE_MS,
       onAction: () => {
-        const t = deleteTimers.current[noteId];
-        if (t) {
-          clearTimeout(t);
-          delete deleteTimers.current[noteId];
+        for (const noteId of noteIds) {
+          const t = deleteTimers.current[noteId];
+          if (t) {
+            clearTimeout(t);
+            delete deleteTimers.current[noteId];
+          }
+          unpend(noteId);
         }
-        setPendingDeleteIds((prev) => {
-          const next = new Set(prev);
-          next.delete(noteId);
-          return next;
-        });
         hapticLight();
       },
     });
+  };
+  const requestDeleteNote = (noteId: string) => requestDeleteNotes([noteId]);
+
+  // --- Mehrfachauswahl: Aktionen auf alle ausgewaehlten Notizen ---
+
+  // Setzt `patch` auf alle Ziele und merkt sich die vorigen Werte fuer ein
+  // gemeinsames Rueckgaengig.
+  const bulkUpdate = async (targets: RecordModel[], patch: Record<string, unknown>, message: string) => {
+    if (targets.length === 0) {
+      exitSelection();
+      return;
+    }
+    const previous = targets.map((n) => ({
+      id: n.id,
+      data: Object.fromEntries(Object.keys(patch).map((k) => [k, n[k]])),
+    }));
+    try {
+      await Promise.all(
+        targets.map((n) => applyChange({ collection: "notes", action: "update", id: n.id, data: patch }))
+      );
+    } catch (err) {
+      console.error("Bulk update failed:", err);
+      notifyError("Aktion fehlgeschlagen.");
+      return;
+    }
+    exitSelection();
+    showToast({
+      message,
+      actionLabel: "Rückgängig",
+      duration: UNDO_DELETE_MS,
+      onAction: () => {
+        hapticLight();
+        Promise.all(
+          previous.map((p) => applyChange({ collection: "notes", action: "update", id: p.id, data: p.data }))
+        ).catch((err) => {
+          console.error("Bulk undo failed:", err);
+          notifyError("Rückgängig fehlgeschlagen.");
+        });
+      },
+    });
+  };
+
+  const handleBulkPin = () => {
+    // Sind alle angepinnt → alle lösen, sonst alle anpinnen.
+    const pin = !selectedNotes.every((n) => n.is_pinned);
+    bulkUpdate(
+      selectedNotes.filter((n) => !!n.is_pinned !== pin),
+      { is_pinned: pin },
+      pin ? "Angepinnt" : "Anpinnen aufgehoben"
+    );
+  };
+
+  const handleBulkArchive = () => {
+    const archive = !selectedNotes.every((n) => n.is_archived);
+    const n = selectedNotes.length;
+    bulkUpdate(
+      selectedNotes.filter((note) => !!note.is_archived !== archive),
+      { is_archived: archive },
+      archive
+        ? n === 1 ? "Archiviert" : `${n} Notizen archiviert`
+        : n === 1 ? "Aus dem Archiv geholt" : `${n} Notizen aus dem Archiv geholt`
+    );
+  };
+
+  const handleBulkColor = (color: string) => {
+    bulkUpdate(
+      selectedNotes.filter((n) => getNoteColorStyles(n.color).id !== getNoteColorStyles(color).id),
+      { color },
+      "Farbe geändert"
+    );
+  };
+
+  const handleBulkDuplicate = async () => {
+    const targets = selectedNotes;
+    let skippedImages = 0;
+    let failed = 0;
+    for (const n of targets) {
+      try {
+        skippedImages += (await duplicateNote(n)).skippedImages;
+      } catch (err) {
+        console.error("Failed to duplicate note:", err);
+        failed++;
+      }
+    }
+    exitSelection();
+    if (failed === targets.length) {
+      notifyError("Duplizieren fehlgeschlagen.");
+      return;
+    }
+    hapticLight();
+    const done = targets.length - failed;
+    showToast({
+      message:
+        (done === 1 ? "Notiz dupliziert" : `${done} Notizen dupliziert`) +
+        (skippedImages > 0 ? ` – ${skippedImages} Bild${skippedImages === 1 ? "" : "er"} fehlt${skippedImages === 1 ? "" : "en"} (offline)` : ""),
+      duration: skippedImages > 0 ? 4000 : 3000,
+    });
+  };
+
+  // Loeschen nur fuer eigene Notizen: eine geteilte Notiz darf nur der Besitzer loeschen.
+  const handleBulkDelete = () => {
+    const mine = selectedNotes.filter((n) => isOwnedByMe(n));
+    const skipped = selectedNotes.length - mine.length;
+    if (mine.length === 0) {
+      notifyError("Nur eigene Notizen können gelöscht werden.");
+      return;
+    }
+    requestDeleteNotes(mine.map((n) => n.id), skipped > 0 ? `${mine.length} gelöscht, ${skipped} nicht deine` : undefined);
+    exitSelection();
   };
 
   // Delete requested from inside an open editor → close the note then soft-delete.
@@ -292,6 +418,7 @@ export default function HomeScreen() {
     onNewChecklist: () => { if (!isNoteOpen || isWide) openChecklist(); },
     onEscape: () => {
       if (isNoteOpen) closeNote();
+      else if (selecting) exitSelection();
     },
     onDeleteInEditor: () => {
       if (session?.note && isOwnedByMe(session.note)) requestDeleteFromEditor(session.note.id);
@@ -397,7 +524,21 @@ export default function HomeScreen() {
       <div className="absolute top-[-30%] right-[-10%] w-[600px] h-[600px] rounded-full blur-[140px] pointer-events-none" style={{ background: "var(--glow-a)" }} />
       <div className="absolute bottom-[-10%] left-[-20%] w-[600px] h-[600px] rounded-full blur-[140px] pointer-events-none" style={{ background: "var(--glow-b)" }} />
 
-      <HomeTopBar searchQuery={searchQuery} onSearchChange={setSearchQuery} />
+      {selecting ? (
+        <SelectionBar
+          count={selectedCount}
+          allPinned={selectedNotes.length > 0 && selectedNotes.every((n) => n.is_pinned)}
+          allArchived={selectedNotes.length > 0 && selectedNotes.every((n) => n.is_archived)}
+          onExit={exitSelection}
+          onTogglePin={handleBulkPin}
+          onToggleArchive={handleBulkArchive}
+          onChangeColor={handleBulkColor}
+          onDuplicate={handleBulkDuplicate}
+          onDelete={handleBulkDelete}
+        />
+      ) : (
+        <HomeTopBar searchQuery={searchQuery} onSearchChange={setSearchQuery} />
+      )}
 
       <div className="max-w-4xl mx-auto px-4 md:px-6 mt-2 relative z-10 animate-fade-in-up">
         {/* Filter bar (only once notes exist; hidden while searching) */}
@@ -488,7 +629,7 @@ export default function HomeScreen() {
       </div>
 
       {/* FAB: tap = checklist, long-press = type picker */}
-      <FAB onCreateText={openText} onCreateChecklist={openChecklist} />
+      {!selecting && <FAB onCreateText={openText} onCreateChecklist={openChecklist} />}
       </div>
 
       {/* Geoeffnete Notiz als eigenes Vollbild (Telefon) bzw. rechte Spalte (ab 1024 px).
