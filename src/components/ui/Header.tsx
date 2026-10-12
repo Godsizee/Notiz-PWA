@@ -1,9 +1,8 @@
 "use client";
 
-import ThemeToggle from "./ThemeToggle";
 import DisplaySettings from "./DisplaySettings";
 import { pb } from "@/lib/pb";
-import { LogOut, Search, X, Cloud, CloudOff, RefreshCw } from "lucide-react";
+import { Search, X, Cloud, CloudOff, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
@@ -43,14 +42,19 @@ export default function Header({ searchQuery = "", onSearchChange }: HeaderProps
   }, [isSearchOpen]);
 
   const handleLogout = () => {
+    const pending = useSyncStore.getState().pendingCount;
+    if (
+      pending > 0 &&
+      !window.confirm(
+        `${pending} Änderung${pending === 1 ? ' ist' : 'en sind'} noch nicht synchronisiert. ` +
+          'Sie werden übertragen, sobald du dich mit demselben Konto wieder anmeldest. Trotzdem abmelden?'
+      )
+    ) {
+      return;
+    }
     pb.authStore.clear();
     document.cookie = "pb_auth=; path=/; max-age=0; SameSite=Lax";
     router.push("/login");
-  };
-
-  const getInitials = (email: string) => {
-    if (!email) return "?";
-    return email[0].toUpperCase();
   };
 
   const closeSearch = () => {
@@ -110,8 +114,9 @@ export default function Header({ searchQuery = "", onSearchChange }: HeaderProps
           {hasDeadLetters ? (
             <button
               onClick={() => clearDeadLetters()}
-              className="relative w-9 h-9 rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)] shadow-sm flex items-center justify-center cursor-pointer"
+              className="relative w-11 h-11 rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)] shadow-sm flex items-center justify-center cursor-pointer"
               title={syncTitle}
+              aria-label={syncTitle}
             >
               <CloudOff className="w-4.5 h-4.5 text-amber-500" />
               <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-amber-500 text-white text-[11px] font-bold flex items-center justify-center">
@@ -120,7 +125,9 @@ export default function Header({ searchQuery = "", onSearchChange }: HeaderProps
             </button>
           ) : (
             <div
-              className="relative w-9 h-9 rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)] shadow-sm flex items-center justify-center cursor-help"
+              role="status"
+              aria-label={syncTitle}
+              className="relative w-11 h-11 rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)] shadow-sm flex items-center justify-center cursor-help"
               title={syncTitle}
             >
               {!isOnline ? (
@@ -144,44 +151,20 @@ export default function Header({ searchQuery = "", onSearchChange }: HeaderProps
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => (isSearchOpen ? closeSearch() : setIsSearchOpen(true))}
-              className={`w-9 h-9 rounded-xl border shadow-sm flex items-center justify-center transition-all cursor-pointer ${
+              className={`w-11 h-11 rounded-xl border shadow-sm flex items-center justify-center transition-all cursor-pointer ${
                 isSearchOpen
                   ? "bg-primary/10 border-primary/30 text-primary"
                   : "bg-[var(--card-bg)] border-[var(--border-color)] text-[var(--text-secondary)] hover:shadow-md"
               }`}
               title="Notizen durchsuchen"
+              aria-label="Notizen durchsuchen"
+              aria-expanded={isSearchOpen}
             >
               <Search className="w-4.5 h-4.5" />
             </motion.button>
           )}
 
-          {/* User Profile Avatar — hidden on very narrow screens */}
-          {userEmail && (
-            <motion.div
-              whileHover={{ scale: 1.05 }}
-              className="hidden xs:flex w-8 h-8 rounded-full text-white items-center justify-center text-sm font-bold shadow-md cursor-help border border-white/10"
-              style={{ backgroundImage: "var(--brand-gradient)" }}
-              title={userEmail}
-            >
-              {getInitials(userEmail)}
-            </motion.div>
-          )}
-
-          <div className="hidden xs:block h-4 w-[1px] bg-[var(--border-color)] mx-0.5" />
-
-          <DisplaySettings />
-
-          <ThemeToggle />
-
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleLogout}
-            className="w-9 h-9 rounded-xl bg-[var(--card-bg)] border border-[var(--border-color)] shadow-sm hover:shadow-md flex items-center justify-center text-red-500 hover:bg-red-500/10 transition-all cursor-pointer"
-            title="Abmelden"
-          >
-            <LogOut className="w-4.5 h-4.5" />
-          </motion.button>
+          <DisplaySettings userEmail={userEmail} onLogout={handleLogout} />
         </div>
       </div>
 

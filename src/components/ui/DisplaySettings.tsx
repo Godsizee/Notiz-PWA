@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { SlidersHorizontal, LayoutGrid, List, FileJson, FileText, Download } from "lucide-react";
+import { SlidersHorizontal, LayoutGrid, List, FileJson, FileText, Download, Sun, Moon, MoonStar, LogOut } from "lucide-react";
 import { usePreferencesStore, type FontSize, type ViewMode } from "@/store/usePreferencesStore";
 import { exportNotes, type ExportFormat } from "@/lib/exportNotes";
 import { useToastStore } from "@/store/useToastStore";
 import { hapticLight } from "@/lib/haptics";
+import { applyTheme, readTheme, type Theme } from "@/lib/theme";
 
 const FONT_OPTIONS: { id: FontSize; label: string }[] = [
   { id: "sm", label: "S" },
@@ -19,7 +20,60 @@ const VIEW_OPTIONS: { id: ViewMode; label: string; Icon: typeof LayoutGrid }[] =
   { id: "list", label: "Liste", Icon: List },
 ];
 
-export default function DisplaySettings() {
+const THEME_OPTIONS: { id: Theme; label: string; Icon: typeof Sun }[] = [
+  { id: "light", label: "Hell", Icon: Sun },
+  { id: "dark", label: "Dunkel", Icon: Moon },
+  { id: "amoled", label: "Schwarz", Icon: MoonStar },
+];
+
+function DesignSection() {
+  const [theme, setTheme] = useState<Theme>("light");
+  // Das No-Flash-Skript (layout.tsx) hat die Klassen schon gesetzt — ablesen,
+  // damit die Auswahl zur Seite passt.
+  useEffect(() => {
+    setTheme(readTheme());
+  }, []);
+
+  return (
+    <>
+      <p className="text-[11px] font-extrabold text-[var(--text-muted)] tracking-widest uppercase mb-2 pl-1">
+        Design
+      </p>
+      <div className="flex gap-1.5 mb-3" role="radiogroup" aria-label="Design">
+        {THEME_OPTIONS.map(({ id, label, Icon }) => {
+          const active = theme === id;
+          return (
+            <button
+              key={id}
+              role="radio"
+              aria-checked={active}
+              onClick={() => {
+                hapticLight();
+                applyTheme(id);
+                setTheme(id);
+              }}
+              className={`flex-1 flex min-h-10 items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer border ${
+                active
+                  ? "bg-primary-strong text-white border-transparent"
+                  : "text-[var(--text-secondary)] border-[var(--border-color)] hover:text-[var(--text-primary)]"
+              }`}
+            >
+              <Icon className="w-4 h-4" />
+              {label}
+            </button>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+interface DisplaySettingsProps {
+  userEmail: string;
+  onLogout: () => void;
+}
+
+export default function DisplaySettings({ userEmail, onLogout }: DisplaySettingsProps) {
   const [open, setOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const viewMode = usePreferencesStore((s) => s.viewMode);
@@ -53,13 +107,15 @@ export default function DisplaySettings() {
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={() => setOpen((v) => !v)}
-        className={`w-9 h-9 rounded-xl border shadow-sm flex items-center justify-center transition-all cursor-pointer ${
+        className={`w-11 h-11 rounded-xl border shadow-sm flex items-center justify-center transition-all cursor-pointer ${
           open
             ? "bg-primary/10 border-primary/30 text-primary"
             : "bg-[var(--card-bg)] border-[var(--border-color)] text-[var(--text-secondary)] hover:shadow-md"
         }`}
-        title="Anzeige-Einstellungen"
-        aria-label="Anzeige-Einstellungen"
+        title="Menü"
+        aria-label="Menü"
+        aria-expanded={open}
+        aria-haspopup="dialog"
       >
         <SlidersHorizontal className="w-4.5 h-4.5" />
       </motion.button>
@@ -75,8 +131,10 @@ export default function DisplaySettings() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -8, scale: 0.96 }}
               transition={{ duration: 0.16 }}
-              className="absolute right-0 top-11 z-50 w-56 rounded-2xl surface p-3 shadow-[var(--shadow-elevated)]"
+              className="absolute right-0 top-12 z-50 w-64 rounded-2xl surface p-3 shadow-[var(--shadow-elevated)]"
             >
+              <DesignSection />
+
               {/* Font size */}
               <p className="text-[11px] font-extrabold text-[var(--text-muted)] tracking-widest uppercase mb-2 pl-1">
                 Textgröße
@@ -91,7 +149,7 @@ export default function DisplaySettings() {
                         hapticLight();
                         setFontSize(f.id);
                       }}
-                      className={`flex-1 py-1.5 rounded-xl font-bold transition-colors cursor-pointer border ${
+                      className={`flex-1 min-h-10 rounded-xl font-bold transition-colors cursor-pointer border ${
                         active
                           ? "bg-primary-strong text-white border-transparent"
                           : "text-[var(--text-secondary)] border-[var(--border-color)] hover:text-[var(--text-primary)]"
@@ -117,7 +175,7 @@ export default function DisplaySettings() {
                         hapticLight();
                         setViewMode(id);
                       }}
-                      className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer border ${
+                      className={`flex-1 flex min-h-10 items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer border ${
                         active
                           ? "bg-primary-strong text-white border-transparent"
                           : "text-[var(--text-secondary)] border-[var(--border-color)] hover:text-[var(--text-primary)]"
@@ -146,12 +204,34 @@ export default function DisplaySettings() {
                     key={id}
                     onClick={() => handleExport(id)}
                     disabled={isExporting}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer border text-[var(--text-secondary)] border-[var(--border-color)] hover:text-[var(--text-primary)] disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="flex-1 flex min-h-10 items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer border text-[var(--text-secondary)] border-[var(--border-color)] hover:text-[var(--text-primary)] disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     <Icon className="w-4 h-4" />
                     {label}
                   </button>
                 ))}
+              </div>
+
+              {/* Account */}
+              <div className="mt-3 border-t border-[var(--border-color)] pt-3">
+                <p className="text-[11px] font-extrabold text-[var(--text-muted)] tracking-widest uppercase mb-2 pl-1">
+                  Konto
+                </p>
+                {userEmail && (
+                  <p className="mb-2 truncate pl-1 text-sm text-[var(--text-secondary)]" title={userEmail}>
+                    {userEmail}
+                  </p>
+                )}
+                <button
+                  onClick={() => {
+                    setOpen(false);
+                    onLogout();
+                  }}
+                  className="flex w-full min-h-10 items-center justify-center gap-2 rounded-xl border border-[var(--border-color)] text-sm font-bold text-red-500 transition-colors hover:bg-red-500/10 cursor-pointer"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Abmelden
+                </button>
               </div>
             </motion.div>
           </>
