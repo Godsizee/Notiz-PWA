@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { RecordModel } from 'pocketbase';
 import { pb, isOwnedByMe } from '@/lib/pb';
-import { Palette, Pin, Archive, Trash2, Check, ExternalLink, RefreshCw, Users, ImagePlus, Camera, Images, ClipboardPaste } from 'lucide-react';
+import { Palette, Pin, Archive, Trash2, Check, ExternalLink, RefreshCw, Users, ImagePlus, Camera, Images, ClipboardPaste, ChevronDown } from 'lucide-react';
 import { getNoteColorStyles, NOTE_COLORS } from '@/lib/colors';
 import { applyChange, newRecordId } from '@/lib/sync';
 import { motion, AnimatePresence } from 'framer-motion';
 import { type ImagesByNote } from '@/lib/useRealtime';
 import { attachImages, deleteImage, moveImageFirst, MAX_IMAGES_PER_NOTE } from '@/lib/noteImages';
 import { useToastStore } from '@/store/useToastStore';
+import { useSyncStore } from '@/store/useSyncStore';
 import { hapticLight } from '@/lib/haptics';
 import NoteImageGallery from '@/components/notes/NoteImageGallery';
 import ImageViewer from '@/components/notes/ImageViewer';
@@ -41,6 +42,7 @@ export default function NoteEditor({ note, imagesByNote, onClose, onRequestDelet
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const showToast = useToastStore((s) => s.showToast);
+  const isOnline = useSyncStore((s) => s.isOnline);
 
   // Track active ID to differentiate between updates and first-time creation
   const [activeNoteId, setActiveNoteId] = useState<string | undefined>(note?.id);
@@ -326,6 +328,7 @@ export default function NoteEditor({ note, imagesByNote, onClose, onRequestDelet
   const extractedLinks = getExtractedLinks(content);
   const colorStyles = getNoteColorStyles(color);
   const canShare = isOwnedByMe(note);
+  const canDelete = isOwnedByMe(note);
 
   const imageMenuItem =
     'w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--background)]/80 transition-colors cursor-pointer text-left whitespace-nowrap';
@@ -381,19 +384,29 @@ export default function NoteEditor({ note, imagesByNote, onClose, onRequestDelet
       )}
 
       {/* Title Textarea */}
-      <textarea
-        placeholder="Titel"
-        className="w-full text-2xl font-extrabold bg-transparent border-none focus:outline-none resize-none mb-4 text-[var(--text-primary)] placeholder-[var(--text-muted)]/40 leading-snug"
-        rows={1}
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            textareaRef.current?.focus();
-          }
-        }}
-      />
+      <div className="flex items-start gap-2 mb-4">
+        <textarea
+          placeholder="Titel"
+          className="min-w-0 flex-1 text-2xl font-extrabold bg-transparent border-none focus:outline-none resize-none text-[var(--text-primary)] placeholder-[var(--text-muted)]/40 leading-snug"
+          rows={1}
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              textareaRef.current?.focus();
+            }
+          }}
+        />
+        <button
+          onClick={onClose}
+          className="tap-target -mr-2 -mt-1 shrink-0 rounded-xl text-[var(--text-secondary)] hover:bg-[var(--background)]/80 cursor-pointer"
+          aria-label="Notiz schließen"
+          title="Schließen"
+        >
+          <ChevronDown className="w-6 h-6" />
+        </button>
+      </div>
 
       {/* Content Textarea */}
       <textarea
@@ -450,8 +463,10 @@ export default function NoteEditor({ note, imagesByNote, onClose, onRequestDelet
           {/* Palette button */}
           <button
             onClick={() => { setShowPalette(!showPalette); setShowImageMenu(false); }}
-            className="shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-xl hover:bg-[var(--background)]/80 flex items-center justify-center transition-colors text-[var(--text-secondary)] cursor-pointer"
+            className="shrink-0 w-10 h-10 xs:w-11 xs:h-11 rounded-xl hover:bg-[var(--background)]/80 flex items-center justify-center transition-colors text-[var(--text-secondary)] cursor-pointer"
             title="Farbe ändern"
+            aria-label="Farbe ändern"
+            aria-expanded={showPalette}
           >
             <Palette size={19} />
           </button>
@@ -473,6 +488,8 @@ export default function NoteEditor({ note, imagesByNote, onClose, onRequestDelet
                       style={{ backgroundColor: c.hex }}
                       onClick={() => { setColor(c.hex); setShowPalette(false); }}
                       title={c.label}
+                      aria-label={c.label}
+                      aria-pressed={color === c.hex}
                     >
                       {color === c.hex && (
                         <Check className="w-4 h-4 text-slate-800" />
@@ -492,8 +509,10 @@ export default function NoteEditor({ note, imagesByNote, onClose, onRequestDelet
           <button
             onClick={() => { setShowImageMenu(!showImageMenu); setShowPalette(false); }}
             disabled={images.length >= MAX_IMAGES_PER_NOTE}
-            className={`shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${showImageMenu ? 'bg-primary/10 text-primary' : 'text-[var(--text-secondary)] hover:bg-[var(--background)]/80'}`}
+            className={`shrink-0 w-10 h-10 xs:w-11 xs:h-11 rounded-xl flex items-center justify-center transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${showImageMenu ? 'bg-primary/10 text-primary' : 'text-[var(--text-secondary)] hover:bg-[var(--background)]/80'}`}
             title="Bild hinzufügen"
+            aria-label="Bild hinzufügen"
+            aria-expanded={showImageMenu}
           >
             <ImagePlus size={19} />
           </button>
@@ -531,8 +550,10 @@ export default function NoteEditor({ note, imagesByNote, onClose, onRequestDelet
           {/* Pin Button */}
           <button
             onClick={() => setIsPinned(!isPinned)}
-            className={`shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-colors cursor-pointer ${isPinned ? 'bg-primary/10 text-primary' : 'text-[var(--text-secondary)] hover:bg-[var(--background)]/80'}`}
+            className={`shrink-0 w-10 h-10 xs:w-11 xs:h-11 rounded-xl flex items-center justify-center transition-colors cursor-pointer ${isPinned ? 'bg-primary/10 text-primary' : 'text-[var(--text-secondary)] hover:bg-[var(--background)]/80'}`}
             title="Notiz anpinnen"
+            aria-label="Notiz anpinnen"
+            aria-pressed={isPinned}
           >
             <Pin size={19} className={isPinned ? 'fill-current' : ''} />
           </button>
@@ -540,8 +561,10 @@ export default function NoteEditor({ note, imagesByNote, onClose, onRequestDelet
           {/* Archive Button */}
           <button
             onClick={() => setIsArchived(!isArchived)}
-            className={`shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-colors cursor-pointer ${isArchived ? 'bg-orange-500/10 text-orange-500' : 'text-[var(--text-secondary)] hover:bg-[var(--background)]/80'}`}
+            className={`shrink-0 w-10 h-10 xs:w-11 xs:h-11 rounded-xl flex items-center justify-center transition-colors cursor-pointer ${isArchived ? 'bg-orange-500/10 text-orange-500' : 'text-[var(--text-secondary)] hover:bg-[var(--background)]/80'}`}
             title="Archivieren"
+            aria-label="Archivieren"
+            aria-pressed={isArchived}
           >
             <Archive size={19} />
           </button>
@@ -550,10 +573,12 @@ export default function NoteEditor({ note, imagesByNote, onClose, onRequestDelet
           <button
             onClick={() => setIsShared(!isShared)}
             disabled={!canShare}
-            className={`shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${isShared ? 'bg-primary/10 text-primary' : 'text-[var(--text-secondary)] hover:bg-[var(--background)]/80'}`}
+            className={`shrink-0 w-10 h-10 xs:w-11 xs:h-11 rounded-xl flex items-center justify-center transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${isShared ? 'bg-primary/10 text-primary' : 'text-[var(--text-secondary)] hover:bg-[var(--background)]/80'}`}
             title={canShare
               ? (isShared ? 'Nicht mehr teilen' : 'Mit Partner teilen')
               : 'Nur wer die Notiz angelegt hat, kann das Teilen beenden'}
+            aria-label={isShared ? 'Nicht mehr teilen' : 'Mit Partner teilen'}
+            aria-pressed={isShared}
           >
             <Users size={19} />
           </button>
@@ -569,12 +594,12 @@ export default function NoteEditor({ note, imagesByNote, onClose, onRequestDelet
             {isSaving ? (
               <>
                 <RefreshCw className="w-3 h-3 animate-spin text-primary" />
-                <span className="hidden xs:inline">Auto-save...</span>
+                <span className="hidden xs:inline">Speichert…</span>
               </>
             ) : (
               <>
                 <Check className="w-3 h-3 text-green-500" />
-                <span className="hidden xs:inline">Gespeichert</span>
+                <span className="hidden xs:inline">{isOnline ? 'Gespeichert' : 'Lokal gespeichert'}</span>
               </>
             )}
           </div>
@@ -584,8 +609,10 @@ export default function NoteEditor({ note, imagesByNote, onClose, onRequestDelet
           {/* Delete Button */}
           <button
             onClick={handleDelete}
-            className="shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-xl hover:bg-red-500/10 flex items-center justify-center text-red-500 transition-colors cursor-pointer"
-            title="Löschen"
+            disabled={!canDelete}
+            className="shrink-0 w-10 h-10 xs:w-11 xs:h-11 rounded-xl hover:bg-red-500/10 flex items-center justify-center text-red-500 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            title={canDelete ? 'Löschen' : 'Nur wer die Notiz angelegt hat, kann sie löschen'}
+            aria-label="Notiz löschen"
           >
             <Trash2 size={19} />
           </button>

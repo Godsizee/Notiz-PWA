@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { RecordModel } from 'pocketbase';
 import { pb, isOwnedByMe } from '@/lib/pb';
-import { Palette, Pin, Archive, Trash2, Plus, X, CheckCircle2, Circle, Check, RefreshCw, MoreVertical, RotateCcw, GripVertical, Users, ScanText, Camera, Images } from 'lucide-react';
+import { Palette, Pin, Archive, Trash2, Plus, X, CheckCircle2, Circle, Check, RefreshCw, MoreVertical, RotateCcw, GripVertical, Users, ScanText, Camera, Images, ChevronDown } from 'lucide-react';
 import { useRealtimeChecklist } from '@/lib/useRealtime';
 import { applyChange, newRecordId, isAbortError } from '@/lib/sync';
 import { usePresence } from '@/lib/usePresence';
@@ -889,6 +889,7 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
   const colorStyles = getNoteColorStyles(color);
   const iconClass = colorStyles.icon;
   const canShare = isOwnedByMe(note);
+  const canDelete = isOwnedByMe(note);
 
   return (
     <div
@@ -935,20 +936,30 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
           )}
         </AnimatePresence>
 
-        <input
-          ref={titleInputRef}
-          type="text"
-          placeholder="Titel der Liste"
-          className="w-full text-2xl font-extrabold bg-transparent border-none outline-none text-[var(--text-primary)] placeholder-[var(--text-muted)]/40"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              newItemInputRef.current?.focus();
-            }
-          }}
-        />
+        <div className="flex items-start gap-2">
+          <input
+            ref={titleInputRef}
+            type="text"
+            placeholder="Titel der Liste"
+            className="min-w-0 flex-1 text-2xl font-extrabold bg-transparent border-none outline-none text-[var(--text-primary)] placeholder-[var(--text-muted)]/40"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                newItemInputRef.current?.focus();
+              }
+            }}
+          />
+          <button
+            onClick={onClose}
+            className="tap-target -mr-2 shrink-0 rounded-xl text-[var(--text-secondary)] hover:bg-[var(--background)]/80 cursor-pointer"
+            aria-label="Liste schließen"
+            title="Schließen"
+          >
+            <ChevronDown className="w-6 h-6" />
+          </button>
+        </div>
       </div>
 
       {/* Checklist Body (Scrollable) — layoutScroll lets framer-motion offset
@@ -1103,8 +1114,10 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
 
           <button
             onClick={() => { setShowPalette(!showPalette); setShowBulkMenu(false); }}
-            className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl hover:bg-[var(--background)]/80 flex items-center justify-center transition-colors text-[var(--text-secondary)] cursor-pointer"
+            className="w-10 h-10 xs:w-11 xs:h-11 rounded-xl hover:bg-[var(--background)]/80 flex items-center justify-center transition-colors text-[var(--text-secondary)] cursor-pointer"
             title="Farbe ändern"
+            aria-label="Farbe ändern"
+            aria-expanded={showPalette}
           >
             <Palette size={19} />
           </button>
@@ -1124,6 +1137,8 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
                     style={{ backgroundColor: c.hex }}
                     onClick={() => { setColor(c.hex); setShowPalette(false); }}
                     title={c.label}
+                    aria-label={c.label}
+                    aria-pressed={color === c.hex}
                   >
                     {color === c.hex && (
                       <Check className="w-4 h-4 text-slate-800" />
@@ -1138,16 +1153,20 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
 
           <button
             onClick={() => setIsPinned(!isPinned)}
-            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-colors cursor-pointer ${isPinned ? 'bg-primary/10 text-primary' : 'text-[var(--text-secondary)] hover:bg-[var(--background)]/80'}`}
+            className={`w-10 h-10 xs:w-11 xs:h-11 rounded-xl flex items-center justify-center transition-colors cursor-pointer ${isPinned ? 'bg-primary/10 text-primary' : 'text-[var(--text-secondary)] hover:bg-[var(--background)]/80'}`}
             title="Liste anpinnen"
+            aria-label="Liste anpinnen"
+            aria-pressed={isPinned}
           >
             <Pin size={19} className={isPinned ? 'fill-current' : ''} />
           </button>
 
           <button
             onClick={() => setIsArchived(!isArchived)}
-            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-colors cursor-pointer ${isArchived ? 'bg-orange-500/10 text-orange-500' : 'text-[var(--text-secondary)] hover:bg-[var(--background)]/80'}`}
+            className={`w-10 h-10 xs:w-11 xs:h-11 rounded-xl flex items-center justify-center transition-colors cursor-pointer ${isArchived ? 'bg-orange-500/10 text-orange-500' : 'text-[var(--text-secondary)] hover:bg-[var(--background)]/80'}`}
             title="Archivieren"
+            aria-label="Archivieren"
+            aria-pressed={isArchived}
           >
             <Archive size={19} />
           </button>
@@ -1155,10 +1174,12 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
           <button
             onClick={() => setIsShared(!isShared)}
             disabled={!canShare}
-            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${isShared ? 'bg-primary/10 text-primary' : 'text-[var(--text-secondary)] hover:bg-[var(--background)]/80'}`}
+            className={`w-10 h-10 xs:w-11 xs:h-11 rounded-xl flex items-center justify-center transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${isShared ? 'bg-primary/10 text-primary' : 'text-[var(--text-secondary)] hover:bg-[var(--background)]/80'}`}
             title={canShare
               ? (isShared ? 'Nicht mehr teilen' : 'Mit Partner teilen')
               : 'Nur wer die Liste angelegt hat, kann das Teilen beenden'}
+            aria-label={isShared ? 'Nicht mehr teilen' : 'Mit Partner teilen'}
+            aria-pressed={isShared}
           >
             <Users size={19} />
           </button>
@@ -1172,12 +1193,12 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
             {isSaving ? (
               <>
                 <RefreshCw className="w-3 h-3 animate-spin text-primary" />
-                <span>Auto-save...</span>
+                <span>Speichert…</span>
               </>
             ) : (
               <>
                 <Check className="w-3 h-3 text-green-500" />
-                <span>Gespeichert</span>
+                <span>{isOnline ? 'Gespeichert' : 'Lokal gespeichert'}</span>
               </>
             )}
           </div>
@@ -1186,8 +1207,11 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
 
           <button
             onClick={() => { setShowBulkMenu(!showBulkMenu); setShowPalette(false); }}
-            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl hover:bg-[var(--background)]/80 flex items-center justify-center transition-colors cursor-pointer ${showBulkMenu ? 'bg-primary/10 text-primary' : 'text-[var(--text-secondary)]'}`}
+            className={`w-10 h-10 xs:w-11 xs:h-11 rounded-xl hover:bg-[var(--background)]/80 flex items-center justify-center transition-colors cursor-pointer ${showBulkMenu ? 'bg-primary/10 text-primary' : 'text-[var(--text-secondary)]'}`}
             title="Aktionen"
+            aria-label="Aktionen"
+            aria-haspopup="menu"
+            aria-expanded={showBulkMenu}
           >
             <MoreVertical size={19} />
           </button>
@@ -1202,7 +1226,7 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
               >
                 <button
                   onClick={() => pickScanPhoto('camera')}
-                  className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--background)]/80 transition-colors cursor-pointer text-left"
+                  className="flex items-center gap-2.5 px-3 py-3 rounded-xl text-sm font-semibold text-[var(--text-secondary)] hover:bg-[var(--background)]/80 transition-colors cursor-pointer text-left"
                 >
                   <ScanText className="w-4 h-4 text-primary" />
                   <span>Zettel oder Rezept scannen</span>
@@ -1212,7 +1236,7 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
                 <button
                   onClick={handleResetAll}
                   disabled={completedItems.length === 0}
-                  className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--background)]/80 transition-colors cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2.5 px-3 py-3 rounded-xl text-sm font-semibold text-[var(--text-secondary)] hover:bg-[var(--background)]/80 transition-colors cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <RotateCcw className="w-4 h-4 text-primary" />
                   <span>Alle Haken entfernen</span>
@@ -1221,24 +1245,26 @@ export default function ChecklistEditor({ note, onClose, onRequestDelete }: Chec
                 <button
                   onClick={handleDeleteCompleted}
                   disabled={completedItems.length === 0}
-                  className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-red-500 hover:bg-red-500/5 transition-colors cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2.5 px-3 py-3 rounded-xl text-sm font-semibold text-red-500 hover:bg-red-500/5 transition-colors cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <Trash2 className="w-4 h-4 text-red-500" />
                   <span>Abgehakte löschen</span>
+                </button>
+
+                <div className="h-px bg-[var(--border-color)] my-1 mx-2" />
+                <button
+                  onClick={() => { setShowBulkMenu(false); handleDeleteNote(); }}
+                  disabled={!canDelete}
+                  title={canDelete ? undefined : 'Nur wer die Liste angelegt hat, kann sie löschen'}
+                  className="flex items-center gap-2.5 px-3 py-3 rounded-xl text-sm font-semibold text-red-500 hover:bg-red-500/5 transition-colors cursor-pointer text-left disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Liste löschen</span>
                 </button>
               </motion.div>
             )}
           </AnimatePresence>
 
-          <div className="hidden xs:block h-6 w-px bg-[var(--border-color)] mx-0.5"></div>
-
-          <button
-            onClick={handleDeleteNote}
-            className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl hover:bg-red-500/10 flex items-center justify-center text-red-500 transition-colors cursor-pointer"
-            title="Liste löschen"
-          >
-            <Trash2 size={19} />
-          </button>
         </div>
       </div>
 

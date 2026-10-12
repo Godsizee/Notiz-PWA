@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, type ReactNode } from "react";
 import Masonry from "react-masonry-css";
 import { useRouter } from "next/navigation";
 import { RecordModel } from "pocketbase";
-import { pb } from "@/lib/pb";
+import { pb, isOwnedByMe } from "@/lib/pb";
 import { useRealtimeNotes, useRealtimeImages } from "@/lib/useRealtime";
 import { useChecklistSearchIndex } from "@/lib/useSearch";
 import { applyChange } from "@/lib/sync";
@@ -256,7 +256,7 @@ export default function Home() {
       if (isSheetOpen) closeSheet();
     },
     onDeleteInEditor: () => {
-      if (activeNote) requestDeleteFromEditor(activeNote.id);
+      if (activeNote && isOwnedByMe(activeNote)) requestDeleteFromEditor(activeNote.id);
     },
     isEditing: isSheetOpen && !!activeNote,
   });
