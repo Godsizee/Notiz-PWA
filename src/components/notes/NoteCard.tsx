@@ -2,12 +2,12 @@
 
 import { useRef, useState } from 'react';
 import { RecordModel } from 'pocketbase';
-import { Pin, Circle, CheckCircle2, ListTodo, FileText, Trash2, Users } from 'lucide-react';
+import { Pin, Circle, CheckCircle2, ListTodo, FileText, Archive, ArchiveRestore, Users } from 'lucide-react';
 import { useRealtimeChecklist } from '@/lib/useRealtime';
 import { motion, useMotionValue, useTransform, type PanInfo } from 'framer-motion';
 import { getNoteColorStyles } from '@/lib/colors';
 import { formatRelative } from '@/lib/relativeTime';
-import { hapticMedium, hapticHeavy } from '@/lib/haptics';
+import { hapticMedium } from '@/lib/haptics';
 import ContextMenu from '@/components/ui/ContextMenu';
 import { parseQuantity } from '@/lib/quantities';
 import NoteContent from '@/components/notes/NoteContent';
@@ -53,7 +53,7 @@ export default function NoteCard({
   // Swipe drag plumbing
   const x = useMotionValue(0);
   const pinRevealOpacity = useTransform(x, [0, SWIPE_THRESHOLD], [0, 1]);
-  const deleteRevealOpacity = useTransform(x, [-SWIPE_THRESHOLD, 0], [1, 0]);
+  const archiveRevealOpacity = useTransform(x, [-SWIPE_THRESHOLD, 0], [1, 0]);
 
   // Long-press / context-menu plumbing
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
@@ -98,9 +98,12 @@ export default function NoteCard({
   };
 
   const handleDragEnd = (_e: PointerEvent | MouseEvent | TouchEvent, info: PanInfo) => {
+    // Wischen = archivieren (umkehrbar, fuer alle Nutzer erlaubt). Loeschen
+    // bleibt im Kontextmenue, weil nur der Besitzer eine geteilte Notiz
+    // loeschen darf und ein Wisch das nicht unterscheiden kann.
     if (info.offset.x <= -SWIPE_THRESHOLD) {
-      hapticHeavy();
-      onDelete();
+      hapticMedium();
+      onToggleArchive();
     } else if (info.offset.x >= SWIPE_THRESHOLD) {
       hapticMedium();
       onTogglePin();
@@ -119,12 +122,12 @@ export default function NoteCard({
         <Pin className="w-6 h-6 fill-current" />
       </motion.div>
 
-      {/* Swipe-left reveal: Delete (sits on the right, behind the card) */}
+      {/* Swipe-left reveal: Archive (sits on the right, behind the card) */}
       <motion.div
-        style={{ opacity: deleteRevealOpacity }}
-        className={`absolute inset-0 ${revealRound} bg-red-500 flex items-center justify-end pr-6 text-white pointer-events-none`}
+        style={{ opacity: archiveRevealOpacity }}
+        className={`absolute inset-0 ${revealRound} bg-orange-500 flex items-center justify-end pr-6 text-white pointer-events-none`}
       >
-        <Trash2 className="w-6 h-6" />
+        {note.is_archived ? <ArchiveRestore className="w-6 h-6" /> : <Archive className="w-6 h-6" />}
       </motion.div>
 
       {/* The draggable card — layoutId enables the card→editor morph */}

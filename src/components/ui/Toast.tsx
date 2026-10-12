@@ -28,6 +28,8 @@ export default function Toast() {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 40, scale: 0.95 }}
           transition={{ type: 'spring', damping: 26, stiffness: 320 }}
+          role="status"
+          aria-live="polite"
           className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[70] w-[calc(100%-2rem)] max-w-sm"
         >
           <div className="flex items-center gap-3 bg-[var(--card-bg)]/95 backdrop-blur-xl border border-[var(--border-color)] shadow-2xl rounded-2xl px-4 py-3">
@@ -46,7 +48,7 @@ export default function Toast() {
                   toast.onAction?.();
                   dismiss();
                 }}
-                className="flex items-center gap-1.5 text-xs font-bold text-primary hover:text-[var(--primary-hover)] uppercase tracking-wide px-2.5 py-1.5 rounded-xl hover:bg-primary/10 transition-colors cursor-pointer shrink-0"
+                className="flex min-h-11 items-center gap-1.5 text-xs font-bold text-primary hover:text-[var(--primary-hover)] uppercase tracking-wide px-2.5 py-1.5 rounded-xl hover:bg-primary/10 transition-colors cursor-pointer shrink-0"
               >
                 <Undo2 className="w-3.5 h-3.5" />
                 {toast.actionLabel}
@@ -55,7 +57,7 @@ export default function Toast() {
 
             <button
               onClick={dismiss}
-              className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer p-1 shrink-0"
+              className="flex min-h-11 min-w-11 items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer shrink-0"
               aria-label="Schließen"
             >
               <X className="w-4 h-4" />

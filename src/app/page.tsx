@@ -143,12 +143,21 @@ export default function Home() {
   };
 
   const handleToggleArchive = async (note: RecordModel) => {
+    const archived = !note.is_archived;
     try {
-      await applyChange({
-        collection: "notes",
-        action: "update",
-        id: note.id,
-        data: { is_archived: !note.is_archived },
+      await applyChange({ collection: "notes", action: "update", id: note.id, data: { is_archived: archived } });
+      showToast({
+        message: archived ? "Archiviert" : "Aus dem Archiv geholt",
+        actionLabel: "Rückgängig",
+        duration: UNDO_DELETE_MS,
+        onAction: () => {
+          hapticLight();
+          applyChange({ collection: "notes", action: "update", id: note.id, data: { is_archived: !archived } })
+            .catch((err) => {
+              console.error("Failed to undo archive:", err);
+              notifyError("Rückgängig fehlgeschlagen.");
+            });
+        },
       });
     } catch (err) {
       console.error("Failed to toggle archive:", err);
@@ -435,14 +444,14 @@ export default function Home() {
                 Keine Notizen oder Checklisten
               </h3>
               <p className="text-sm text-[var(--text-secondary)] mt-2 max-w-sm leading-relaxed">
-                Tippe auf das Plus-Symbol für eine Notiz – oder halte es gedrückt, um eine Checkliste zu erstellen.
+                Tippe auf das Plus für eine neue Liste – halte es gedrückt für eine Textnotiz.
               </p>
             </motion.div>
           )}
         </PullToRefresh>
       </div>
 
-      {/* FAB: tap = note, long-press = type picker */}
+      {/* FAB: tap = checklist, long-press = type picker */}
       <FAB onCreateText={openText} onCreateChecklist={openChecklist} />
 
       {/* Bottom Sheet — existing notes morph out of their card (shared element) */}

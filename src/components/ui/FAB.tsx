@@ -115,7 +115,7 @@ export default function FAB({ onCreateText, onCreateChecklist }: FABProps) {
           onContextMenu={(e) => e.preventDefault()}
           style={{ backgroundImage: "var(--fab-gradient)" }}
           className="w-14 h-14 text-white rounded-2xl shadow-[var(--shadow-elevated)] flex items-center justify-center hover:scale-110 active:scale-95 transition-transform duration-200 border border-white/15 select-none touch-none ring-1 ring-black/5"
-          aria-label="Notiz erstellen — tippen für Notiz, halten für Auswahl"
+          aria-label="Neue Liste – gedrückt halten für eine Textnotiz"
         >
           <motion.span animate={{ rotate: menuOpen ? 45 : 0 }} transition={{ duration: 0.2 }}>
             <Plus size={32} strokeWidth={2.5} />

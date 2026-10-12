@@ -44,7 +44,8 @@ export default function FilterBar({
               hapticLight();
               onFilterChange(f.id);
             }}
-            className={`relative shrink-0 px-3.5 py-1.5 rounded-full text-xs font-bold tracking-wide transition-colors cursor-pointer whitespace-nowrap ${
+            aria-pressed={isActive}
+            className={`relative shrink-0 min-h-10 px-3.5 py-2 rounded-full text-xs font-bold tracking-wide transition-colors cursor-pointer whitespace-nowrap ${
               isActive
                 ? 'text-white'
                 : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[var(--card-bg)] border border-[var(--border-color)]'
@@ -77,7 +78,9 @@ export default function FilterBar({
                   onColorChange(isActive ? null : color);
                 }}
                 title={`Nach Farbe filtern`}
-                className={`shrink-0 w-7 h-7 rounded-full border flex items-center justify-center transition-all cursor-pointer ${styles.bg} ${
+                aria-label="Nach Farbe filtern"
+                aria-pressed={isActive}
+                className={`shrink-0 w-9 h-9 rounded-full border flex items-center justify-center transition-all cursor-pointer ${styles.bg} ${
                   isActive
                     ? 'ring-2 ring-primary ring-offset-1 ring-offset-[var(--background)] scale-110'
                     : 'border-[var(--border-color)] hover:scale-105'
