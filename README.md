@@ -87,6 +87,7 @@ Alle Variablen sind in [`.env.example`](.env.example) dokumentiert.
 | --- | --- | --- |
 | `NEXT_PUBLIC_POCKETBASE_URL` | Build | PocketBase-URL, **wie der Browser sie erreicht**. Landet im Client-Bundle und im Service Worker. |
 | `POCKETBASE_URL` | Laufzeit (Server) | Dieselbe Instanz, **wie der Server sie erreicht** — im Docker-Netz der Servicename statt `localhost`. |
+| `POCKETBASE_CONNECT_VIA` | Laufzeit (Server) | Optional: Hostname oder IP, über den `/api/scan` die Verbindung zu PocketBase aufbaut (Host-Header und TLS-Name bleiben die aus `POCKETBASE_URL`). Nötig, wenn die App im selben Docker-Netz wie der Reverse-Proxy läuft und PocketBase nur über die öffentliche URL desselben Hosts erreicht: Docker leitet diese Schleife dann nicht zurück (`UND_ERR_CONNECT_TIMEOUT` im Log). Beispiel Coolify: `coolify-proxy`. |
 | `NEXT_PUBLIC_SITE_URL` | Build | Öffentliche Basis-URL, gebraucht für den Redirect des Android-Share-Targets. |
 | `PB_SUPERUSER_EMAIL` / `PB_SUPERUSER_PASSWORD` | PocketBase-Start | Admin-Konto, das beim ersten Start des Containers angelegt wird. |
 | `REGISTRATION_ALLOWED_EMAILS` | Laufzeit (Server) | Kommagetrennte Allowlist für `/api/register`. Leer = Registrierung geschlossen. |

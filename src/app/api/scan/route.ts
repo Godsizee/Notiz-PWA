@@ -1,3 +1,5 @@
+import http from "node:http";
+import https from "node:https";
 import { NextResponse } from "next/server";
 import PocketBase from "pocketbase";
 
@@ -18,6 +20,8 @@ export const dynamic = "force-dynamic";
 
 // Kein Fallback auf eine konkrete Instanz, siehe next.config.mjs.
 const PB_URL = process.env.POCKETBASE_URL || process.env.NEXT_PUBLIC_POCKETBASE_URL;
+// Optional: Hostname/IP, ueber den die Verbindung zu PocketBase laeuft (siehe refreshViaHost).
+const PB_CONNECT_VIA = process.env.POCKETBASE_CONNECT_VIA || undefined;
 const WEBHOOK_URL = process.env.N8N_SCAN_WEBHOOK_URL;
 const WEBHOOK_KEY = process.env.N8N_SCAN_WEBHOOK_KEY;
 
@@ -104,9 +108,10 @@ type AuthResult = { userId: string } | { reason: "unauthenticated" | "unreachabl
 async function authenticate(request: Request): Promise<AuthResult> {
   const token = request.headers.get("authorization")?.trim();
   if (!token || !PB_URL) return { reason: "unauthenticated" };
-  const pb = new PocketBase(PB_URL);
-  pb.authStore.save(token);
   try {
+    if (PB_CONNECT_VIA) return { userId: await refreshViaHost(PB_URL, PB_CONNECT_VIA, token) };
+    const pb = new PocketBase(PB_URL);
+    pb.authStore.save(token);
     const { record } = await pb.collection("users").authRefresh({ requestKey: null, signal: AbortSignal.timeout(AUTH_TIMEOUT_MS) });
     return { userId: record.id };
   } catch (err) {
@@ -118,10 +123,50 @@ async function authenticate(request: Request): Promise<AuthResult> {
   }
 }
 
+// Dieselbe Pruefung wie authRefresh(), aber mit der TCP-Verbindung zu `via` statt zum
+// Host aus der URL; Host-Header und TLS-Servername bleiben der echte Name. Fuer den
+// Fall, dass der Server PocketBase nur ueber die oeffentliche URL seines eigenen
+// Hosts erreicht und Docker diese Schleife nicht zurueckleitet (Traefik im selben
+// Netz wie die App, siehe POCKETBASE_CONNECT_VIA im README). Fehler tragen wie
+// beim PocketBase-SDK ein `status` (0 = keine Antwort).
+function refreshViaHost(baseUrl: string, via: string, token: string): Promise<string> {
+  const base = new URL(baseUrl);
+  const secure = base.protocol === "https:";
+  return new Promise((resolve, reject) => {
+    const req = (secure ? https : http).request(
+      {
+        host: via,
+        port: base.port || (secure ? 443 : 80),
+        method: "POST",
+        path: `${base.pathname.replace(/\/$/, "")}/api/collections/users/auth-refresh`,
+        servername: secure ? base.hostname : undefined,
+        headers: { Host: base.host, Authorization: token, "Content-Length": 0, Accept: "application/json" },
+        timeout: AUTH_TIMEOUT_MS,
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (chunk: Buffer) => chunks.push(chunk));
+        res.on("end", () => {
+          const status = res.statusCode ?? 0;
+          if (status !== 200) return reject({ status, message: `PocketBase antwortet mit ${status}` });
+          try {
+            const id = (JSON.parse(Buffer.concat(chunks).toString("utf8")) as { record?: { id?: unknown } }).record?.id;
+            if (typeof id === "string" && id) return resolve(id);
+          } catch {}
+          reject({ status: 502, message: "Unerwartete Antwort von PocketBase" });
+        });
+      }
+    );
+    req.on("timeout", () => req.destroy(Object.assign(new Error("Timeout"), { code: "ETIMEDOUT" })));
+    req.on("error", (err) => reject({ status: 0, message: err.message, code: (err as NodeJS.ErrnoException).code }));
+    req.end();
+  });
+}
+
 function causeOf(err: unknown): string {
-  const e = err as { message?: unknown; originalError?: { cause?: { code?: unknown; message?: unknown }; message?: unknown } };
+  const e = err as { message?: unknown; code?: unknown; originalError?: { cause?: { code?: unknown; message?: unknown }; message?: unknown } };
   const cause = e?.originalError?.cause;
-  const parts = [e?.message, e?.originalError?.message, cause?.code, cause?.message].filter((p): p is string => typeof p === "string" && p !== "");
+  const parts = [e?.message, e?.code, e?.originalError?.message, cause?.code, cause?.message].filter((p): p is string => typeof p === "string" && p !== "");
   return parts.join(" | ") || "unbekannt";
 }
 
