@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { RecordModel } from 'pocketbase';
 import { pb, isOwnedByMe } from '@/lib/pb';
-import { Palette, Pin, Archive, Trash2, Check, ExternalLink, RefreshCw, Users, Plus, MoreVertical, Camera, Images, ClipboardPaste, ListChecks, Copy, Share2, ClipboardCopy } from 'lucide-react';
+import { Palette, Pin, Archive, Trash2, Check, ExternalLink, RefreshCw, Users, Plus, MoreVertical, Camera, Images, ClipboardPaste, ListChecks, Copy, Share2, ClipboardCopy, List, ListTodo, Bold } from 'lucide-react';
 import { getNoteColorStyles, NOTE_COLORS } from '@/lib/colors';
 import { applyChange, newRecordId } from '@/lib/sync';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -16,6 +16,7 @@ import { NoteTopBar, NoteBottomBar, BarButton } from '@/components/notes/NoteBar
 import { useEscapeKey } from '@/lib/useEscapeKey';
 import { convertTextToChecklist } from '@/lib/convertNote';
 import { noteToShareText } from '@/lib/noteText';
+import { continueListOnEnter, toggleBold, toggleLineMarker, type LineMarker, type TextEdit } from '@/lib/textFormat';
 
 interface NoteEditorProps {
   note?: RecordModel | null; // null if creating a new note
@@ -47,6 +48,8 @@ export default function NoteEditor({ note, imagesByNote, onClose, onCreated, onA
   const [showPalette, setShowPalette] = useState(false);
   const [showImageMenu, setShowImageMenu] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [contentFocused, setContentFocused] = useState(false);
+  const contentBlurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isAttaching, setIsAttaching] = useState(false);
@@ -285,6 +288,56 @@ export default function NoteEditor({ note, imagesByNote, onClose, onCreated, onA
     onClose();
   };
 
+  // --- Formatierung: Muster, die NoteContent schon darstellt ---
+
+  // Aendert den Text und setzt danach die Auswahl neu — ein kontrolliertes
+  // textarea springt nach setContent mit dem Cursor ans Ende.
+  const applyTextEdit = (edit: TextEdit) => {
+    setContent(edit.value);
+    requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(edit.start, edit.end);
+    });
+  };
+
+  const formatLines = (marker: LineMarker) => {
+    const el = textareaRef.current;
+    if (!el) return;
+    applyTextEdit(toggleLineMarker(contentRef.current, el.selectionStart, el.selectionEnd, marker));
+  };
+
+  const formatBold = () => {
+    const el = textareaRef.current;
+    if (!el) return;
+    applyTextEdit(toggleBold(contentRef.current, el.selectionStart, el.selectionEnd));
+  };
+
+  // Enter in einer Aufzaehlungs-/Kaestchen-Zeile setzt das Muster fort; in einer
+  // leeren Musterzeile beendet es die Liste.
+  const handleContentKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing) return;
+    const el = e.currentTarget;
+    if (el.selectionStart !== el.selectionEnd) return;
+    const edit = continueListOnEnter(contentRef.current, el.selectionStart);
+    if (!edit) return;
+    e.preventDefault();
+    applyTextEdit(edit);
+  };
+
+  // Blur verzoegert, damit ein Tipp auf einen Formatierknopf die Leiste nicht vorher ausblendet.
+  const handleContentFocus = () => {
+    if (contentBlurTimer.current) clearTimeout(contentBlurTimer.current);
+    setContentFocused(true);
+  };
+  const handleContentBlur = () => {
+    contentBlurTimer.current = setTimeout(() => setContentFocused(false), 150);
+  };
+  useEffect(() => () => {
+    if (contentBlurTimer.current) clearTimeout(contentBlurTimer.current);
+  }, []);
+
   // --- Umwandeln, Teilen, Kopieren, Duplizieren (Mehr-Menue) ---
 
   const flushPendingSave = async () => {
@@ -505,6 +558,21 @@ export default function NoteEditor({ note, imagesByNote, onClose, onCreated, onA
         <Palette size={20} />
       </BarButton>
 
+      {/* Formatierung, solange der Cursor im Text steht */}
+      {contentFocused && (
+        <>
+          <BarButton label="Aufzählung" keepFocus onClick={() => formatLines('bullet')}>
+            <List size={20} />
+          </BarButton>
+          <BarButton label="Kästchen" keepFocus onClick={() => formatLines('checkbox')}>
+            <ListTodo size={20} />
+          </BarButton>
+          <BarButton label="Fett" keepFocus onClick={formatBold}>
+            <Bold size={20} />
+          </BarButton>
+        </>
+      )}
+
       <AnimatePresence>
         {showImageMenu && (
           <motion.div
@@ -719,6 +787,9 @@ export default function NoteEditor({ note, imagesByNote, onClose, onCreated, onA
         value={content}
         onChange={(e) => setContent(e.target.value)}
         onPaste={handlePaste}
+        onKeyDown={handleContentKeyDown}
+        onFocus={handleContentFocus}
+        onBlur={handleContentBlur}
       />
 
       {/* Tactile URL Link Pills (Touch-first link interaction) */}
@@ -757,7 +828,7 @@ export default function NoteEditor({ note, imagesByNote, onClose, onCreated, onA
         </div>
       )}
 
-      <NoteBottomBar leading={bottomLeading} status={statusText} trailing={bottomTrailing} />
+      <NoteBottomBar leading={bottomLeading} status={contentFocused ? '' : statusText} trailing={bottomTrailing} />
 
       {viewerIndex !== null && images.length > 0 && (
         <ImageViewer

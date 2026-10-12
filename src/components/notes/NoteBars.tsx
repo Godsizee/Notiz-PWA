@@ -86,6 +86,7 @@ export function BarButton({
   pressed,
   disabled,
   expanded,
+  keepFocus,
   children,
 }: {
   label: string;
@@ -93,11 +94,14 @@ export function BarButton({
   pressed?: boolean;
   disabled?: boolean;
   expanded?: boolean;
+  /** Fokus im Textfeld halten (mousedown nicht annehmen), z. B. fuer Formatierknoepfe. */
+  keepFocus?: boolean;
   children: ReactNode;
 }) {
   return (
     <button
       onClick={onClick}
+      onMouseDown={keepFocus ? (e) => e.preventDefault() : undefined}
       disabled={disabled}
       aria-label={label}
       title={label}
