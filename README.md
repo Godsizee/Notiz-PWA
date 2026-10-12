@@ -8,6 +8,7 @@ Die App ist ein **geschlossenes System**: Es gibt keine offene Registrierung, Ko
 
 - **Freitext & Checklisten:** Textnotizen oder abhakbare Listen für To-Dos und Einkäufe.
 - **Bilder:** Fotos direkt aus der Kamera, aus der Galerie, per Einfügen oder per Android-Teilen-Menü an eine Notiz hängen. Sie werden im Browser auf 2048px/WebP heruntergerechnet (das entfernt nebenbei EXIF-GPS), erscheinen als Galerie über dem Titel und als Collage auf der Karte. Vollbild mit Wischen, Pinch- und Doppeltipp-Zoom. Uploads laufen wie alles andere über die Sync-Queue, funktionieren also auch offline.
+- **Foto-Scan:** Im offenen Einkaufszettel ein Foto eines handgeschriebenen Zettels oder eines Rezepts machen (oder bis zu drei aus der Galerie wählen). Claude Haiku 5.5 liest die Einträge über einen n8n-Workflow aus und rechnet Mengen in Einkaufsmengen um (`500 g Mehl` → `1 Packung Mehl`, `1 Päckchen Backpulver` → `Backpulver`). Nichts landet ungeprüft in der Liste: erst die Prüfansicht, bereits vorhandene Einträge werden erkannt, danach gibt es „Rückgängig“. Das Foto wird zur Texterkennung an den eigenen n8n-Server und an Anthropic übertragen und nicht gespeichert; ohne Konfiguration (siehe unten) ist die Funktion einfach nicht erreichbar.
 - **Offline-Schreiben (Sync-Queue):** Notizen unterwegs tippen oder Checklisten abhaken. Aktionen landen in einer lokalen IndexedDB-Queue und syncen bei der nächsten Verbindung. Kein Datenverlust.
 - **Gemeinsame Notizen:** Notizen per Knopfdruck freigeben. Super für die gemeinsame Einkaufsliste. Realtime-Update inklusive.
 - **Live-Presence:** Zeigt an, wer gerade eine Checkliste bearbeitet ("Claudia bearbeitet gerade...").
@@ -16,15 +17,17 @@ Die App ist ein **geschlossenes System**: Es gibt keine offene Registrierung, Ko
 
 ## Tech Stack
 
-- **Framework:** Next.js 16 (App Router), React 19, TypeScript
+- **Framework:** Next.js 16 (App Router), React 19, TypeScript, Node.js 24
 - **Styling:** Tailwind CSS v4, Framer Motion
 - **State Management:** Zustand
 - **Backend:** PocketBase (Auth, Realtime, DB)
+- **PWA:** Serwist (Service Worker)
+- **Tests:** Vitest
 - **Deployment:** Docker / Coolify
 
 ## Schnellstart
 
-Voraussetzungen: **Node.js 20+** und **Docker** (für PocketBase).
+Voraussetzungen: **Node.js 24+** und **Docker** (für PocketBase).
 
 ```bash
 git clone https://github.com/Godsizee/Notiz-PWA.git
@@ -65,7 +68,8 @@ npm run dev
 ```
 
 Läuft auf <http://localhost:3000>. Der Service Worker ist im Dev-Modus
-deaktiviert (siehe `disable:` in [`next.config.mjs`](next.config.mjs)) — für
+über `SerwistProvider disable` in [`src/app/layout.tsx`](src/app/layout.tsx)
+ausgeschaltet — für
 Offline- und Installations-Tests braucht es einen Produktionsbuild:
 
 ```bash
@@ -78,12 +82,13 @@ Alle Variablen sind in [`.env.example`](.env.example) dokumentiert.
 
 | Variable | Wo | Zweck |
 | --- | --- | --- |
-| `NEXT_PUBLIC_POCKETBASE_URL` | Build | PocketBase-URL, **wie der Browser sie erreicht**. Landet im Client-Bundle und in den Workbox-Regeln des Service Workers. |
+| `NEXT_PUBLIC_POCKETBASE_URL` | Build | PocketBase-URL, **wie der Browser sie erreicht**. Landet im Client-Bundle und im Service Worker. |
 | `POCKETBASE_URL` | Laufzeit (Server) | Dieselbe Instanz, **wie der Server sie erreicht** — im Docker-Netz der Servicename statt `localhost`. |
 | `NEXT_PUBLIC_SITE_URL` | Build | Öffentliche Basis-URL, gebraucht für den Redirect des Android-Share-Targets. |
 | `PB_SUPERUSER_EMAIL` / `PB_SUPERUSER_PASSWORD` | PocketBase-Start | Admin-Konto, das beim ersten Start des Containers angelegt wird. |
 | `REGISTRATION_ALLOWED_EMAILS` | Laufzeit (Server) | Kommagetrennte Allowlist für `/api/register`. Leer = Registrierung geschlossen. |
 | `PB_INITIAL_USER_EMAILS` / `PB_INITIAL_USER_PASSWORD` | PocketBase-Start | Optional: Startkonten mit erzwungenem Passwortwechsel. |
+| `N8N_SCAN_WEBHOOK_URL` / `N8N_SCAN_WEBHOOK_KEY` | Laufzeit (Server) | Optional: Webhook-URL und Header-Schlüssel (`X-Notiz-Scan-Key`) des n8n-Workflows für den Foto-Scan. Beide leer = `/api/scan` antwortet mit 503. |
 
 > `NEXT_PUBLIC_POCKETBASE_URL` ist **Pflicht** — fehlt sie, bricht der Build mit
 > einer Meldung ab, statt still auf eine fremde Instanz zu zeigen.
@@ -103,10 +108,12 @@ Alle Variablen sind in [`.env.example`](.env.example) dokumentiert.
 | `npm start` | Produktionsserver |
 | `npm run lint` | ESLint |
 | `npm run typecheck` | `tsc --noEmit` |
+| `npm test` | Vitest (Logik ohne DOM, kein Netzzugriff) |
+| `npm run eval:scan` | Qualitätsmessung des Foto-Scans gegen echte Fotos aus `SCAN_EVAL_DIR`, kostet ein paar Cent; ohne die Variablen wird sie übersprungen |
 
 ## Deployment
 
-Bei jedem Push auf `master` prüft GitHub Actions Lint und Typen, baut danach das
+Bei jedem Push auf `master` (und `beta`) prüft GitHub Actions Lint, Typen und Tests, baut danach das
 Docker-Image und schiebt es nach `ghcr.io/godsizee/notiz-pwa`. Die
 [`docker-compose.yml`](docker-compose.yml) zieht dieses Image und startet es
 zusammen mit PocketBase.
@@ -129,6 +136,9 @@ Damit der Build die richtige Backend-URL einbackt, müssen im Repository unter
 - **Sicherheitsheader:** CSP, `nosniff`, `Referrer-Policy`, `X-Frame-Options`,
   `Permissions-Policy` und HSTS werden in
   [`next.config.mjs`](next.config.mjs) gesetzt.
+- **Foto-Scan:** `/api/scan` prüft die Sitzung per `authRefresh`, begrenzt auf
+  30 Scans pro Stunde und Nutzer und ruft den n8n-Webhook nur serverseitig mit
+  einem Header-Schlüssel auf. Der Browser sieht weder URL noch Schlüssel.
 - **Keine Zugangsdaten im Repo:** Alle Secrets kommen aus der Umgebung. Es gibt
   bewusst keine Fallback-Werte, die auf eine konkrete Instanz zeigen.
 
