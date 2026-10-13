@@ -92,7 +92,7 @@ const themeScript = `
   var meta = document.createElement('meta');
   meta.setAttribute('name', 'theme-color');
   meta.id = 'theme-color-dynamic';
-  meta.setAttribute('content', theme === 'amoled' ? '#000000' : theme === 'dark' ? '#0b0717' : theme === 'lifeos' ? '#fff4e0' : '#390099');
+  meta.setAttribute('content', theme === 'amoled' ? '#000000' : theme === 'dark' ? '#0b0717' : theme === 'lifeos' ? '#fff4e0' : theme === 'arielle' ? '#f7eeda' : '#390099');
   document.head.appendChild(meta);
 })();
 `;

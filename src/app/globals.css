@@ -274,9 +274,77 @@
   --note-orange-icon: #0b0b0b;
 }
 
+/* ------------------------------------------------------------------ */
+/*  Arielle theme (5. Design) — hell. Sand-Seite, Tiefsee-Text,        */
+/*  Flossen-Gruen als Hauptfarbe, Haar-Rot fuer den Plus-Knopf,        */
+/*  Muschel-Lila nur im Hintergrundschein. Keine Dunkelvariante: ohne  */
+/*  .dark, die Klasse allein setzt das Design (wie .lifeos). Fuer      */
+/*  dunkel gibt es "Schwarz".                                          */
+/*  Gruen: #00A144 erreicht mit weisser Schrift nur 3,4 : 1, darum     */
+/*  nutzen Buttons, aktive Filter und Links #007A35 (5,5 : 1); das     */
+/*  Original-Gruen bleibt im Verlauf (--brand-gradient).               */
+/* ------------------------------------------------------------------ */
+.arielle {
+  --background: #f7eeda;
+  --background-soft: #eee2c6;
+  --foreground: #0c4a5e;
+  --card-bg: #fffbf0;
+  --border-color: rgba(12, 74, 94, 0.14);
+
+  --text-primary: #0c4a5e;
+  --text-secondary: #35697a;
+  --text-muted: #4a6e7a;
+
+  --primary: #007a35;
+  --primary-strong: #007a35;
+  --accent: #d52036;
+  --primary-hover: #006329;
+  --primary-on: #ffffff;
+  --primary-light: rgba(0, 122, 53, 0.12);
+  --primary-ring: rgba(0, 122, 53, 0.35);
+
+  --fab-bg: #d52036;
+  --fab-gradient: linear-gradient(135deg, #d52036 0%, #b3162b 100%);
+  --brand-gradient: linear-gradient(120deg, #00a144 0%, #6623ab 100%);
+  --glow-a: rgba(102, 35, 171, 0.14);
+  --glow-b: rgba(0, 161, 68, 0.12);
+
+  --shadow-card: 0 1px 2px rgba(12, 74, 94, 0.06), 0 6px 18px -8px rgba(12, 74, 94, 0.18);
+  --shadow-elevated: 0 12px 40px -12px rgba(12, 74, 94, 0.35);
+
+  /* Notizfarben (muessen zu ARIELLE_NOTE_COLORS in lib/themeColor.ts passen) */
+  --note-white: #fffbf0;
+  --note-white-border: rgba(12, 74, 94, 0.10);
+  --note-white-icon: #4a6e7a;
+
+  --note-blue: #d4f0ff;
+  --note-blue-border: #9adbf8;
+  --note-blue-icon: #0a78ad;
+
+  --note-green: #d5fbe3;
+  --note-green-border: #9fe8bc;
+  --note-green-icon: #007a35;
+
+  --note-yellow: #f8e7b0;
+  --note-yellow-border: #ebd28a;
+  --note-yellow-icon: #8a6a0a;
+
+  --note-pink: #fcd9dd;
+  --note-pink-border: #f3a9b2;
+  --note-pink-icon: #c21b30;
+
+  --note-purple: #e8dbf6;
+  --note-purple-border: #cfb4ea;
+  --note-purple-icon: #6623ab;
+
+  --note-orange: #fcdcc4;
+  --note-orange-border: #f2b98d;
+  --note-orange-icon: #b4501a;
+}
+
 /* No-JS fallback: honor the OS preference when no explicit theme class set */
 @media (prefers-color-scheme: dark) {
-  :root:not(.light):not(.dark):not(.lifeos) {
+  :root:not(.light):not(.dark):not(.lifeos):not(.arielle) {
     --background: #0b0717;
     --background-soft: #140c28;
     --foreground: #f3f0fb;

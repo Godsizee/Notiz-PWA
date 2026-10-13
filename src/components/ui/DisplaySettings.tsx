@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { SlidersHorizontal, LayoutGrid, List, FileJson, FileText, Download, Sun, Moon, MoonStar, Square, LogOut } from "lucide-react";
+import { SlidersHorizontal, LayoutGrid, List, FileJson, FileText, Download, Sun, Moon, MoonStar, Square, Waves, LogOut } from "lucide-react";
 import { usePreferencesStore, type FontSize, type SortMode, type ViewMode } from "@/store/usePreferencesStore";
 import { exportNotes, type ExportFormat } from "@/lib/exportNotes";
 import { useToastStore } from "@/store/useToastStore";
@@ -31,6 +31,7 @@ const THEME_OPTIONS: { id: Theme; label: string; Icon: typeof Sun }[] = [
   { id: "dark", label: "Dunkel", Icon: Moon },
   { id: "amoled", label: "Schwarz", Icon: MoonStar },
   { id: "lifeos", label: "Life OS", Icon: Square },
+  { id: "arielle", label: "Arielle", Icon: Waves },
 ];
 
 function DesignSection() {
