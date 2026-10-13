@@ -97,7 +97,7 @@ export default function HomeTopBar({ searchQuery, onSearchChange }: HomeTopBarPr
               decoding="async"
               className="logo-img h-9 w-9 rounded-[var(--radius-pill)] object-cover"
             />
-            {/* Life-OS-Design: statt des violetten App-Icons ein pinker Sticker */}
+            {/* Life OS: statt des violetten App-Icons ein pinker Sticker; Arielle: eine runde Marke im Verlauf */}
             <span className="logo-sticker" aria-hidden="true">B&amp;B</span>
           </button>
 

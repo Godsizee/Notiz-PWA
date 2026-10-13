@@ -706,3 +706,18 @@ html.lifeos .logo-sticker {
   box-shadow: 3px 3px 0 0 #0b0b0b;
   rotate: -3deg;
 }
+
+/* Logo: im Arielle-Design eine runde Marke im Gruen-Lila-Verlauf statt des App-Icons */
+html.arielle .logo-img { display: none; }
+html.arielle .logo-sticker {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 9999px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--primary-on);
+  background: var(--brand-gradient);
+}
