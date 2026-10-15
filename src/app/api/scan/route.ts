@@ -176,8 +176,19 @@ export async function POST(request: Request) {
     return fail(503, "scan_unavailable");
   }
 
+  const requestId = `scan_${crypto.randomUUID()}`;
+  const startedAt = Date.now();
+  // Ablaufprotokoll: haengt ein Scan, zeigt die letzte Zeile im Log, hinter
+  // welchem Schritt (Sitzung, Bilder lesen, n8n) er steckt.
+  const trace = (step: string) => console.info(`[scan ${requestId}] +${Date.now() - startedAt}ms ${step}`);
+  trace(`Anfrage eingegangen (content-length=${request.headers.get("content-length") ?? "?"})`);
+
   const auth = await authenticate(request);
-  if ("reason" in auth) return auth.reason === "unreachable" ? fail(503, "scan_unavailable") : fail(401, "unauthenticated");
+  if ("reason" in auth) {
+    trace(`Sitzungspruefung: ${auth.reason}`);
+    return auth.reason === "unreachable" ? fail(503, "scan_unavailable") : fail(401, "unauthenticated");
+  }
+  trace("Sitzung ok");
   if (rateLimited(auth.userId)) return fail(429, "rate_limited");
 
   if (Number(request.headers.get("content-length") || 0) > MAX_REQUEST_BYTES) {
@@ -187,9 +198,11 @@ export async function POST(request: Request) {
   let form: FormData;
   try {
     form = await request.formData();
-  } catch {
+  } catch (err) {
+    console.error(`[scan ${requestId}] +${Date.now() - startedAt}ms Formular nicht lesbar:`, err);
     return fail(400, "invalid_input");
   }
+  trace("Formular gelesen");
 
   const files = form.getAll("image").filter((entry): entry is File => typeof entry !== "string");
   if (files.length === 0 || files.length > MAX_IMAGES) return fail(400, "invalid_input");
@@ -202,9 +215,10 @@ export async function POST(request: Request) {
   }
 
   const existing = parseExisting(form.get("existing"));
-  const requestId = `scan_${crypto.randomUUID()}`;
+  trace(`${images.length} Bild(er) gelesen (${files.reduce((sum, file) => sum + file.size, 0)} Bytes), ${existing.length} Listeneintraege`);
 
   let upstream: Response;
+  trace("rufe n8n");
   try {
     upstream = await fetch(WEBHOOK_URL, {
       method: "POST",
@@ -215,11 +229,13 @@ export async function POST(request: Request) {
     });
   } catch (err) {
     const timedOut = err instanceof DOMException && err.name === "TimeoutError";
-    console.error(`[scan ${requestId}] n8n nicht erreichbar:`, err);
+    console.error(`[scan ${requestId}] +${Date.now() - startedAt}ms n8n nicht erreichbar:`, err);
     return fail(timedOut ? 504 : 503, timedOut ? "scan_timeout" : "scan_unavailable");
   }
+  trace(`n8n antwortet mit HTTP ${upstream.status}`);
 
   const payload: unknown = await upstream.json().catch(() => null);
+  trace("n8n-Antwort gelesen");
   const body = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : null;
 
   // Kein v1-Vertrag: Workflow inaktiv (404), falscher Schluessel (403, Text
