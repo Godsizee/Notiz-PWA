@@ -19,11 +19,35 @@ export class ScanError extends Error {
 // Etwas laenger als der Server auf n8n wartet (100 s), damit dessen
 // Fehlermeldung ankommt, statt dass der Client vorher aufgibt.
 const CLIENT_TIMEOUT_MS = 110_000;
+// Die Token-Erneuerung ist ein einzelner kurzer Aufruf und zaehlt nicht zum Scan-Budget.
+const REFRESH_TIMEOUT_MS = 10_000;
+// Gleicher Wortlaut wie die 401-Antwort von /api/scan.
+const SESSION_EXPIRED = 'Deine Sitzung ist abgelaufen. Bitte melde dich neu an.';
 
 /** Ein Eintrag der aktuellen Liste, mit dem der Workflow die gelesenen Eintraege abgleicht. */
 export interface ScanListEntry {
   text: string;
   done: boolean;
+}
+
+// Die App zeigt dank Offline-Cache auch dann Notizen, wenn das Token laengst nicht
+// mehr gilt; /api/scan wuerde es dann mit 401 abweisen, obwohl man angemeldet
+// aussieht. Deshalb vor dem Scan erneuern: das liefert ein frisches Token (der
+// AuthStore schreibt es in Cookie und IndexedDB) oder meldet eine tote Sitzung,
+// bevor das Foto hochgeladen wird. Eine Erneuerung, die nur wegen Netz oder
+// Zeitueberschreitung scheitert, bricht den Scan nicht ab: dann entscheidet der Server.
+async function refreshSession(signal?: AbortSignal): Promise<void> {
+  if (!pb.authStore.token) return;
+  const timeout = AbortSignal.timeout(REFRESH_TIMEOUT_MS);
+  try {
+    await pb.collection('users').authRefresh({ requestKey: null, signal: signal ? AbortSignal.any([signal, timeout]) : timeout });
+  } catch (err) {
+    if (signal?.aborted) throw new ScanError('aborted', 'Scan abgebrochen.');
+    const status = (err as { status?: unknown } | null)?.status;
+    if (status === 400 || status === 401 || status === 403 || status === 404) {
+      throw new ScanError('unauthenticated', SESSION_EXPIRED);
+    }
+  }
 }
 
 /**
@@ -34,6 +58,8 @@ export async function requestScan(images: Blob[], existing: ScanListEntry[], sig
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
     throw new ScanError('offline', 'Keine Internetverbindung – der Foto-Scan braucht Netz.');
   }
+
+  await refreshSession(signal);
 
   const form = new FormData();
   images.forEach((blob, index) => form.append('image', blob, `scan-${index + 1}.jpg`));
