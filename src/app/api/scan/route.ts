@@ -107,7 +107,10 @@ type AuthResult = { userId: string } | { reason: "unauthenticated" | "unreachabl
 // Nutzer nicht zum erneuten Anmelden schicken — die Ursache steht im Log.
 async function authenticate(request: Request): Promise<AuthResult> {
   const token = request.headers.get("authorization")?.trim();
-  if (!token || !PB_URL) return { reason: "unauthenticated" };
+  if (!token || !PB_URL) {
+    console.warn(`[scan] Sitzungspruefung: ${!token ? "kein Authorization-Header" : "POCKETBASE_URL fehlt"}`);
+    return { reason: "unauthenticated" };
+  }
   try {
     if (PB_CONNECT_VIA) return { userId: await refreshViaHost(PB_URL, PB_CONNECT_VIA, token) };
     const pb = new PocketBase(PB_URL);
@@ -116,7 +119,11 @@ async function authenticate(request: Request): Promise<AuthResult> {
     return { userId: record.id };
   } catch (err) {
     const status = typeof (err as { status?: unknown })?.status === "number" ? (err as { status: number }).status : 0;
-    if (status === 400 || status === 401 || status === 403 || status === 404) return { reason: "unauthenticated" };
+    if (status === 400 || status === 401 || status === 403 || status === 404) {
+      // Nie das Token selbst loggen, nur Herkunft der Ablehnung und Ablaufzeit.
+      console.warn(`[scan] PocketBase (${new URL(PB_URL).origin}) lehnt das Token ab: HTTP ${status} | ${causeOf(err)} | ${describeToken(token)}`);
+      return { reason: "unauthenticated" };
+    }
     // Origin statt voller URL: ohne Pfad, damit nichts Unnoetiges im Log landet.
     console.error(`[scan] PocketBase (${new URL(PB_URL).origin}) nicht erreichbar oder antwortet mit ${status || "Netzwerkfehler"}:`, causeOf(err));
     return { reason: "unreachable" };
@@ -161,6 +168,18 @@ function refreshViaHost(baseUrl: string, via: string, token: string): Promise<st
     req.on("error", (err) => reject({ status: 0, message: err.message, code: (err as NodeJS.ErrnoException).code }));
     req.end();
   });
+}
+
+// Nur fuers Log: laeuft das Token laut eigenem exp-Claim noch? So ist eine
+// Ablehnung durch PocketBase "abgelaufen" oder "fremde Instanz" unterscheidbar.
+function describeToken(token: string): string {
+  try {
+    const payload = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString("utf8")) as { exp?: unknown };
+    if (typeof payload.exp !== "number") return "JWT ohne exp";
+    return `JWT exp=${new Date(payload.exp * 1000).toISOString()} (${payload.exp * 1000 > Date.now() ? "noch gueltig" : "abgelaufen"})`;
+  } catch {
+    return "kein lesbares JWT";
+  }
 }
 
 function causeOf(err: unknown): string {
